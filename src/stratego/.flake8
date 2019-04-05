@@ -1,0 +1,3 @@
+[flake8]
+# E701: Multiple statements on one line (colon)
+ignore = E701
