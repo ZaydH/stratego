@@ -8,15 +8,48 @@ r"""
     :copyright: (c) 2019 by Steven Walton and Zayd Hammoudeh.
     :license: MIT, see LICENSE for more details.
 """
-
+import logging
+import sys
 from enum import Enum
 from pathlib import Path
 from typing import Union
 
-from location import Location
-from piece import Color, Rank, Piece
-from board import Board
-from player import Player
+import matplotlib
+
+from .location import Location
+from .piece import Color, Rank, Piece
+from .board import Board
+from .player import Player
+
+
+def setup_logger(quiet_mode: bool = False, filename: str = "test.log",
+                 log_level: int = logging.DEBUG):
+    r"""
+    Logger Configurator
+
+    Configures the test logger.
+
+    :param quiet_mode: True if quiet mode (i.e., disable logging to stdout) is used
+    :param filename: Log file name
+    :param log_level: Level to log
+    """
+    date_format = '%m/%d/%Y %I:%M:%S %p'  # Example Time Format - 12/12/2010 11:46:36 AM
+    format_str = '%(asctime)s -- %(levelname)s -- %(message)s'
+    logging.basicConfig(filename=filename, level=log_level, format=format_str, datefmt=date_format)
+
+    # Also print to stdout
+    if not quiet_mode:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(log_level)
+        formatter = logging.Formatter(format_str)
+        handler.setFormatter(formatter)
+        logging.getLogger().addHandler(handler)
+
+    # Matplotlib clutters the logger so change its log level
+    # noinspection PyProtectedMember
+    matplotlib._log.setLevel(logging.INFO)  # pylint: disable=protected-access
+
+    logging.info("******************* New Run Beginning *****************")
 
 
 class Game:
@@ -24,7 +57,7 @@ class Game:
     def __init__(self, board_path: Union[Path, str], state_path: Union[Path, str]):
         if isinstance(state_path, str): state_path = Path(state_path)
         self._brd = Board.importer(board_path)
-        self._state = State.importer(state_path)
+        self._state = State.importer(state_path, self._brd)
 
     def move(self):
         pass
@@ -39,8 +72,9 @@ class State:
         next_turn = "NextTurn"
         piece = "Piece"
 
-    def __init__(self):
+    def __init__(self, brd: Board):
         self._next = None
+        self._brd = brd
         self._red = Player(Color.RED)
         self._blue = Player(Color.BLUE)
 
@@ -50,11 +84,12 @@ class State:
 
     @staticmethod
     # pylint: disable=protected-access
-    def importer(file_path) -> 'State':
+    def importer(file_path: Union[Path, str], brd: Board) -> 'State':
         r"""
         Factory method to construct \p State objects from a file.
 
         :param file_path: File defining the current state
+        :param brd: Board corresponding to the state to the current state
         :return: Constructed \p State object
         """
         if isinstance(file_path, str): file_path = Path(file_path)
@@ -64,7 +99,7 @@ class State:
         except IOError:
             raise IOError("Unable to read state file \"%s\"" % str(file_path))
 
-        state = State()
+        state = State(brd)
         for line in lines:
             line = line.strip()
             if line[0] == "#":
@@ -87,11 +122,18 @@ class State:
 
     def _is_valid(self) -> bool:
         r""" Simple sanity check the state is valid """
-        res = False  # ToDo change to True once method implemented
+        res = True
 
-        # Check no duplicate locations
+        # Check no duplicate locations. Intersection of the sets means a duplicate
+        if self._red.piece_locations() & self._blue.piece_locations():
+            logging.error("Duplicate piece locations")
+            res = False
 
         # Check pieces conform to PieceSet field in Board class
+        for plyr in [self._red, self._blue]:
+            if not plyr.verify_piece_set(self._brd.piece_set):
+                logging.error("Player %s has invalid piece information", plyr.color.name)
+                res = False
 
         return res
 

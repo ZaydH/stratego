@@ -12,7 +12,7 @@ r"""
 from enum import Enum
 from typing import Union, List
 
-from location import Location
+from .location import Location
 
 
 class Color(Enum):
@@ -170,8 +170,3 @@ class Piece:
 
     def __hash__(self) -> int:
         return hash(self._id)
-
-
-if __name__ == "__main__":
-    import doctest
-    doctest.testmod()
