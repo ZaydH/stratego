@@ -22,7 +22,7 @@ argument-rgx=([A-Za-z]|[a-z_][a-z0-9_]{1,30})$
 class-attribute-rgx=_?([A-Za-z0-9_]{2,30}|[A-Z]|(__.*__))$
 
 # Good variable names which should always be accepted, separated by a comma
-good-names=c,f,g,i,j,k,K,l,m,M,n,N,o,p,q,v,w,x,X,y,z,Z
+good-names=c,r,f,g,i,j,k,K,l,m,M,n,N,o,p,q,v,w,x,X,y,z,Z
 
 # Regular expression which should only match function or class names that do
 # not require a docstring.

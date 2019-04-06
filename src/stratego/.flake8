@@ -1,3 +1,4 @@
 [flake8]
 # E701: Multiple statements on one line (colon)
-ignore = E701
+# E704: Multiple statements on one line (def)
+ignore = E701,E704

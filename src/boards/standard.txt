@@ -1,0 +1,15 @@
+BoardDim|10|10
+BlockedLoc|(4,2)|(4,3)|(4,6)|(4,7)
+BlockedLoc|(5,2)|(5,3)|(5,6)|(5,7)
+Rank_1|1
+Rank_2|1
+Rank_3|2
+Rank_4|3
+Rank_5|4
+Rank_6|4
+Rank_7|4
+Rank_8|5
+Rank_9|8
+Rank_S|1
+Rank_B|6
+Rank_F|1

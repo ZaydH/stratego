@@ -14,6 +14,7 @@ from typing import Union, List
 
 
 class Player(Enum):
+    r""" Encapsulates a player """
     Red = 0
     Blue = 1
 
@@ -30,15 +31,20 @@ class Rank:
     MARSHALL = 1
     MINER = 8
 
+    _all = []
+
     def __init__(self, rank: Union[str, int]):
         assert not isinstance(rank, str) or rank in {Rank.SPY, Rank.BOMB, Rank.FLAG}
         assert not isinstance(rank, int) or Rank.MIN() <= rank <= Rank.MAX()
         self._val = rank
 
     @staticmethod
-    def all() -> List[Union[int, str]]:
+    def get_all() -> List['Rank']:
         r""" Generate a list of all valid ranks"""
-        return list(range(Rank.MIN(), Rank.MAX() + 1)) + [Rank.SPY, Rank.BOMB, Rank.FLAG]
+        if not Rank._all:
+            all_rank = list(range(Rank.MIN(), Rank.MAX() + 1)) + [Rank.SPY, Rank.BOMB, Rank.FLAG]
+            Rank._all = [Rank(r) for r in all_rank]
+        return Rank._all
 
     @property
     def value(self) -> Union[str, int]:
@@ -46,10 +52,10 @@ class Rank:
         return self._val
 
     @staticmethod
-    def MIN() -> int: return 1
+    def MIN() -> int: return 1  # pylint: disable=missing-docstring, invalid-name
 
     @staticmethod
-    def MAX() -> int: return 9
+    def MAX() -> int: return 9  # pylint: disable=missing-docstring,invalid-name
 
     def is_immobile(self) -> bool:
         r"""
@@ -61,8 +67,15 @@ class Rank:
         return self._val == Rank.FLAG or self._val == Rank.BOMB
 
     def __eq__(self, other) -> bool:
+        r"""
+        Returns True if the two ranks are equal
+
+        >>> p1 = Rank(Rank.MARSHALL); b = Rank(Rank.BOMB); s = Rank(Rank.SPY)
+        >>> print(p1 == p1, p1 == b, s == p1)
+        True False False
+        """
         assert self.value != Rank.FLAG and self.value != Rank.BOMB, "Attacker cant be stationary"
-        self.value == other.value
+        return self.value == other.value
 
     def __gt__(self, other: 'Rank') -> bool:
         r"""
@@ -92,17 +105,34 @@ class Rank:
     def __str__(self) -> str:
         return str(self.value)
 
+    def __hash__(self):
+        return hash(str(self.value))
+
+    def board_file_str(self) -> str:
+        r""" Identifier for rank entries in the board file """
+        return "Rank_" + str(self)
+
+    @staticmethod
+    def get_from_board_file(line_header: str) -> 'Rank':
+        r""" Convert a line header from a board file to a corresponding Rank object. """
+        spl = line_header.split("_", max=1)
+        try:
+            return Rank(int(spl[1]))
+        except ValueError:
+            return Rank(spl[1])
+
 
 class Piece:
+    r""" Per piece analysis """
     def __init__(self, color: Player, rank):
         self._color = color
         self._rank = rank if isinstance(rank, Rank) else Rank(rank)
 
     @property
-    def rank(self) -> Rank: return self._rank
+    def rank(self) -> Rank: return self._rank  # pylint: disable=missing-docstring, invalid-name
 
     @property
-    def color(self) -> Player: return self._color
+    def color(self) -> Player: return self._color  # pylint: disable=missing-docstring, invalid-name
 
     def is_immobile(self) -> True:
         r""" Returns True if piece cannot move """
