@@ -14,7 +14,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Union
 
-import matplotlib
+# import matplotlib
 
 from .location import Location
 from .piece import Color, Rank, Piece
@@ -47,7 +47,7 @@ def setup_logger(quiet_mode: bool = False, filename: str = "test.log",
 
     # Matplotlib clutters the logger so change its log level
     # noinspection PyProtectedMember
-    matplotlib._log.setLevel(logging.INFO)  # pylint: disable=protected-access
+    # matplotlib._log.setLevel(logging.INFO)  # pylint: disable=protected-access
 
     logging.info("******************* New Run Beginning *****************")
 
