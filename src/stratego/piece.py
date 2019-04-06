@@ -13,15 +13,10 @@ from enum import Enum
 from typing import Union, List
 
 
-class Player(Enum):
+class Color(Enum):
     r""" Encapsulates a player """
     Red = 0
     Blue = 1
-
-    @staticmethod
-    def count() -> int:
-        r""" Total number of players """
-        return 2
 
 
 class Rank:
@@ -129,7 +124,7 @@ class Rank:
 
 class Piece:
     r""" Per piece analysis """
-    def __init__(self, color: Player, rank):
+    def __init__(self, color: Color, rank):
         self._color = color
         self._rank = rank if isinstance(rank, Rank) else Rank(rank)
 
@@ -137,7 +132,7 @@ class Piece:
     def rank(self) -> Rank: return self._rank  # pylint: disable=missing-docstring, invalid-name
 
     @property
-    def color(self) -> Player: return self._color  # pylint: disable=missing-docstring, invalid-name
+    def color(self) -> Color: return self._color  # pylint: disable=missing-docstring, invalid-name
 
     def is_immobile(self) -> True:
         r""" Returns True if piece cannot move """
