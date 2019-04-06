@@ -12,11 +12,17 @@ r"""
 from enum import Enum
 from typing import Union, List
 
+from location import Location
+
 
 class Color(Enum):
     r""" Encapsulates a player """
-    Red = 0
-    Blue = 1
+    RED = 0
+    BLUE = 1
+
+    def get_next(self):
+        r""" Get the next turn's player color. """
+        return Color.RED if self == Color.BLUE else Color.BLUE
 
 
 class Rank:
@@ -34,7 +40,9 @@ class Rank:
     _all = []
 
     def __init__(self, rank: Union[str, int]):
-        assert not isinstance(rank, str) or rank in {Rank.SPY, Rank.BOMB, Rank.FLAG}
+        if isinstance(rank, str):
+            if rank not in {Rank.SPY, Rank.BOMB, Rank.FLAG}:
+                rank = int(rank)
         assert not isinstance(rank, int) or Rank.MIN() <= rank <= Rank.MAX()
         self._val = rank
 
@@ -108,13 +116,13 @@ class Rank:
     def __hash__(self):
         return hash(str(self.value))
 
-    def board_file_str(self) -> str:
-        r""" Identifier for rank entries in the board file """
+    def get_file_str(self) -> str:
+        r""" Identifier for rank entries in the board and state files """
         return "Rank_" + str(self)
 
     @staticmethod
-    def get_from_board_file(line_header: str) -> 'Rank':
-        r""" Convert a line header from a board file to a corresponding Rank object. """
+    def get_from_file(line_header: str) -> 'Rank':
+        r""" Convert a line header from a board or state file to a corresponding Rank object. """
         spl = line_header.split("_", maxsplit=1)
         try:
             return Rank(int(spl[1]))
@@ -123,16 +131,30 @@ class Rank:
 
 
 class Piece:
+    _next_id = 0
     r""" Per piece analysis """
-    def __init__(self, color: Color, rank):
+    def __init__(self, color: Color, rank: Rank, loc: Location):
         self._color = color
         self._rank = rank if isinstance(rank, Rank) else Rank(rank)
+        self._loc = loc
+        self._id = Piece._next_id
+        Piece._next_id += 1
 
     @property
     def rank(self) -> Rank: return self._rank  # pylint: disable=missing-docstring, invalid-name
 
     @property
     def color(self) -> Color: return self._color  # pylint: disable=missing-docstring, invalid-name
+
+    @property
+    def loc(self) -> Location:
+        r""" Accessor for the location of the piece """
+        return self._loc
+
+    @loc.setter
+    def loc(self, loc: Location) -> None:
+        r""" Mutator for the piece's location """
+        self._loc = loc
 
     def is_immobile(self) -> True:
         r""" Returns True if piece cannot move """
@@ -145,6 +167,9 @@ class Piece:
     def __eq__(self, other: 'Piece') -> bool:
         assert self.color != other.color, "Player cannot attack itself"
         return self.rank == other.rank
+
+    def __hash__(self) -> int:
+        return hash(self._id)
 
 
 if __name__ == "__main__":

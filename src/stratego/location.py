@@ -77,7 +77,7 @@ class Location:
         return Location(*[int(x) for x in re.findall(r"\d+", loc_str)])
 
     @staticmethod
-    def board_file_example() -> str:
+    def file_example_str() -> str:
         r""" Example displaying how the board file blocked location should appear. """
         return "(ROW,COLUMN)"
 

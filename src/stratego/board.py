@@ -95,15 +95,14 @@ class Board:
         :return: Board with parameters in in \p file_path
         """
         if isinstance(file_path, str): file_path = Path(file_path)
-
         try:
             with open(file_path, "r") as f_in:
                 lines = f_in.readlines()
         except IOError:
-            raise ValueError("Unable to read board file \"%s\"" % str(file_path))
+            raise IOError("Unable to read board file \"%s\"" % str(file_path))
 
         brd = Board()
-        rank_headers = [r.board_file_str() for r in Rank.get_all()]
+        rank_headers = [r.get_file_str() for r in Rank.get_all()]
         for line in lines:
             line = line.strip()  # Ignore preceding and trailing whitespace
             # Ignore comment lines
@@ -126,7 +125,7 @@ class Board:
                     brd._blocked.add(loc)
             # Parse the (original) number of pieces for a given rank
             elif spl[0] in rank_headers:
-                rank = Rank.get_from_board_file(spl[0])
+                rank = Rank.get_from_file(spl[0])
                 assert not brd._piece_set.exists(rank), "Duplicate rank count in board file"
                 brd._piece_set.set_rank_count(rank, spl[1])
             else:
@@ -196,15 +195,15 @@ class Board:
         # noinspection PyListCreation
         lines = [[Board.ImporterKeys.board_dim.value, "NUM_ROWS", "NUM_COLS"]]
 
-        lines.append([Board.ImporterKeys.blocked_loc.value, Location.board_file_example()])
+        lines.append([Board.ImporterKeys.blocked_loc.value, Location.file_example_str()])
         for _ in range(0, 2):
-            lines[-1].append(Location.board_file_example())
+            lines[-1].append(Location.file_example_str())
         lines[-1].append("...")
         # Show multiple lines is supported
-        lines.append([Board.ImporterKeys.blocked_loc.value, Location.board_file_example()])
+        lines.append([Board.ImporterKeys.blocked_loc.value, Location.file_example_str()])
 
         for rank in Rank.get_all():
-            lines.append([rank.board_file_str(), "STARTING_COUNT"])
+            lines.append([rank.get_file_str(), "STARTING_COUNT"])
 
         file_path = Path(file_path)
         file_path.parent.mkdir(exist_ok=True)
