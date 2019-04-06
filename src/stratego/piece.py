@@ -18,6 +18,11 @@ class Player(Enum):
     Red = 0
     Blue = 1
 
+    @staticmethod
+    def count() -> int:
+        r""" Total number of players """
+        return 2
+
 
 class Rank:
     r"""
@@ -115,7 +120,7 @@ class Rank:
     @staticmethod
     def get_from_board_file(line_header: str) -> 'Rank':
         r""" Convert a line header from a board file to a corresponding Rank object. """
-        spl = line_header.split("_", max=1)
+        spl = line_header.split("_", maxsplit=1)
         try:
             return Rank(int(spl[1]))
         except ValueError:

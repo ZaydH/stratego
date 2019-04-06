@@ -20,11 +20,26 @@ from piece import Rank
 class Location:
     r""" Encapsulates a board location """
     def __init__(self, row: int, col: int):
-        self.r = row
-        self.c = col
+        self._r = row
+        self._c = col
+        self._hash = None
+
+    @property
+    def r(self) -> int:
+        r""" Get row of the location """
+        return self._r
+
+    @property
+    def c(self) -> int:
+        r""" Get column of the location """
+        return self._c
 
     def __eq__(self, other) -> bool:
         return self.r == other.r and self.c == other.c
+
+    def __hash__(self) -> int:
+        if self._hash is None: self._hash = hash((self.r, self.c))
+        return self._hash
 
     def down(self) -> 'Location':
         r""" Build location below the implicit one """
@@ -92,11 +107,13 @@ class Board:
 
         def set_rank_count(self, rank: Rank, count: Union[str, int]) -> None:
             r""" Mutator for the number of pieces of specified rank. """
-            assert count >= 0, "Rank count set below zero"
             if rank in self._counts:
                 self._n -= self._counts[rank]
-            self._counts[rank] = count if isinstance(count, int) else int(count)
-            self._n += self._counts[rank]
+
+            if not isinstance(count, int): count = int(count)
+            assert count >= 0, "Rank count set below zero"
+            self._counts[rank] = count
+            self._n += count
 
         def get_rank_count(self, rank: Rank) -> int:
             r""" Accessor for number of pieces of the specified rank """
@@ -108,9 +125,17 @@ class Board:
             r""" Number of initial pieces PER PLAYER """
             return self._n
 
+        def has_all_ranks(self) -> bool:
+            r""" Verify all ranks are accounted for """
+            return len(self._counts) == len(Rank.get_all())
+
+        def exists(self, rank: Rank) -> bool:
+            r""" Returns True if rank already has a value """
+            return rank in self._counts
+
     def __init__(self):
         self._rows = self._cols = None
-        self._impass = set()  # locations within board boundaries pieces cannot enter
+        self._blocked = set()  # locations within board boundaries pieces cannot enter
         self._piece_set = Board.PieceSet()
 
     @property
@@ -124,6 +149,7 @@ class Board:
         return self._cols
 
     @staticmethod
+    # pylint: disable=protected-access
     def importer(file_path: Union[Path, str]) -> 'Board':
         r"""
         Board generator that follows the Factory Method pattern.
@@ -137,27 +163,32 @@ class Board:
             with open(file_path, "r") as f_in:
                 lines = f_in.readlines()
         except IOError:
-            raise ValueError("Unable to read board file.")
+            raise ValueError("Unable to read board file \"%s\"" % str(file_path))
 
         brd = Board()
         rank_headers = [r.board_file_str() for r in Rank.get_all()]
         for line in lines:
             spl = line.split(Board.SEP)
+            # Parse the board dimension information
             if spl[0] == Board.ImporterKeys.board_dim.value:
                 assert len(spl) == 3, "Invalid board dimension information"
-                assert brd._rows is None and brd._cols is None  # pylint: disable=protected-access
+                assert brd._rows is None and brd._cols is None, "Duplicate dimensions line"
                 brd._rows, brd._cols = int(spl[1]), int(spl[2])
-            elif spl[0] == Board.ImporterKeys.blocked_loc:
+            # Parse the board locations where a piece cannot be placed (e.g., lake)
+            elif spl[0] == Board.ImporterKeys.blocked_loc.value:
                 assert len(spl) > 1, "No blocked location specified"
                 for loc_str in spl[1:]:
                     loc = Location.parse(loc_str)
-                    assert loc not in brd._impass  # pylint: disable=protected-access
-                    brd._impass.add(loc)  # pylint: disable=protected-access
+                    assert loc.r < brd.num_rows and loc.c < brd.num_cols, "Outside board boundary"
+                    assert loc not in brd._blocked, "Duplicate blocked location"
+                    brd._blocked.add(loc)
+            # Parse the (original) number of pieces for a given rank
             elif spl[0] in rank_headers:
                 rank = Rank.get_from_board_file(spl[0])
-                brd._piece_set.set_rank_count(rank, spl[1])  # pylint: disable=protected-access
+                assert not brd._piece_set.exists(rank), "Duplicate rank count in board file"
+                brd._piece_set.set_rank_count(rank, spl[1])
             else:
-                raise ValueError("Unparseable file line")
+                raise ValueError("Unparseable file line \"%s\"" % line)
         # Sanity check the configuration
         assert brd._is_valid()  # pylint: disable=protected-access
         return brd
@@ -172,15 +203,35 @@ class Board:
         """
         if loc.r < 0 or loc.r >= self.num_rows or loc.c < 0 or loc.c >= self.num_cols:
             return False
-        return loc not in self._impass
+        return loc not in self._blocked
 
     def _is_valid(self):
         r""" Returns true if the board has no (obvious) errors """
+        res = True
         if self._rows is None or self._cols is None or self.num_rows <= 0 or self.num_cols <= 0:
             logging.warning("Invalid number of rows/column in board.")
-            return False
-
-        return True
+            res = False
+        # Multiply number of pieces by two since two players
+        if self.num_rows * self.num_cols - len(self._blocked) < 2 * self._piece_set.tot_count:
+            logging.warning("More pieces on board than open spaces")
+            res = False
+        # Make sure no piece was excluded from the board file
+        if not self._piece_set.has_all_ranks():
+            logging.warning("Some ranks missing from the Board's PieceSet")
+            res = False
+        # Ensure number of pieces aligns with a complete row for each player
+        for row, inc in ((0, 1), (self.num_rows - 1, -1)):
+            rem_count = self._piece_set.tot_count
+            while rem_count > 0 and 0 <= row < self.num_rows:
+                for col in range(0, self.num_cols):
+                    if Location(row, col) not in self._blocked:
+                        rem_count -= 1
+                row += inc
+            if rem_count != 0:
+                logging.warning("Piece count does not align with number of rows")
+                res = False
+                break
+        return res
 
     @staticmethod
     def _print_template_file(file_path: Union[Path, str]) -> None:
