@@ -28,6 +28,12 @@ class State:
         r""" Accessor for player whose turn is next """
         return self._next
 
+    @property
+    def red(self) -> Player: return self._red
+
+    @property
+    def blue(self) -> Player: return self._blue
+
     @staticmethod
     # pylint: disable=protected-access
     def importer(file_path: Union[Path, str], brd: Board) -> 'State':

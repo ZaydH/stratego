@@ -1,11 +1,13 @@
 from stratego import Game, setup_logger
-
+from stratego.printer import Printer
 
 # ToDo Add argparse
 
+
 def _main():
     setup_logger()
-    _ = Game("boards/standard.txt", "states/debug.txt")
+    game = Game("boards/standard.txt", "states/debug.txt", visibility=Printer.Visibility.ALL)
+    game.display_current()
 
 
 if __name__ == "__main__":

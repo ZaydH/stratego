@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Union
 
 # import matplotlib
-
 from .board import Board
+from .printer import Printer
 from .state import State
 
 
@@ -51,10 +51,17 @@ def setup_logger(quiet_mode: bool = False, filename: str = "test.log",
 
 class Game:
     r""" Encapsulates an active Stratego game """
-    def __init__(self, board_path: Union[Path, str], state_path: Union[Path, str]):
+    def __init__(self, board_path: Union[Path, str], state_path: Union[Path, str],
+                 visibility: Printer.Visibility):
         if isinstance(state_path, str): state_path = Path(state_path)
+
         self._brd = Board.importer(board_path)
         self._state = State.importer(state_path, self._brd)
+        self._printer = Printer(self._brd, self._state, visibility)
 
     def move(self):
         pass
+
+    def display_current(self):
+        r""" Displays the current state of the game to the console """
+        print(self._printer.write())

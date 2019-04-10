@@ -1,7 +1,7 @@
+import copy
 from enum import Enum
 
-from sty import fg, bg, ef, rs, RgbFg
-from typing import Union
+from sty import fg, bg, ef, rs  # , RgbFg
 
 from .board import Board
 from .location import Location
@@ -16,7 +16,8 @@ class Printer:
     """
 
     SEP = "|"
-    EMPTY_LOCATION = " "  # Verify
+    EMPTY_LOCATION = " "
+
     HIDDEN = " "
     # HIDDEN = chr(9608)  # White box
 
@@ -24,7 +25,7 @@ class Printer:
         NONE = set()
         RED = {Color.RED}
         BLUE = {Color.BLUE}
-        ALL = RED.value | BLUE.value
+        ALL = RED | BLUE
 
     def __init__(self, brd: Board, state: State, visibility: 'Printer.Visibility'):
         r"""
@@ -35,92 +36,65 @@ class Printer:
         """
         self._brd = brd
         # Empty board with all pieces blank
-        self._piece_state = [[Printer.EMPTY_LOCATION for _ in range(self._brd.num_cols)]
-                             for _ in range(self._brd.num_rows)]
+        base_row = [Printer.SEP if i == 0 else Printer.EMPTY_LOCATION
+                    for _ in range(self._brd.num_cols) for i in range(0, 2)]
+        base_row.append(Printer.SEP)  # n + 1 separators since one surrounds
+        # Add dummy header and footer rows to simplify join
+        self._cells = [[""]]
+        self._cells += [copy.copy(base_row) for _ in range(self._brd.num_rows)]
+        self._cells.append([""])
+
         self._visible = visibility.value
+        self._row_sep = "".join(["\n", "-".join(["+"] * (self._brd.num_cols + 1)), "\n"])
+
+        # Add the existing pieces
+        for plyr in [state.red, state.blue]:
+            for p in plyr.pieces():
+                self._set_piece(p.loc, self._format_piece(p), exist_ok=False)
+
+    def _get_piece(self, loc: Location) -> str:
+        r""" Get the string for the piece at the specified \p Location """
+        return self._cells[loc.r + 1][2 * loc.c + 1]
+
+    def _set_piece(self, loc: Location, value: str, exist_ok: bool = True):
+        r""" Set the string for the piece at the specified \p Location with \p value """
+        if not exist_ok:
+            assert self._is_loc_empty(loc), "Setting a location that should be empty"
+        self._cells[loc.r + 1][2 * loc.c + 1] = value
 
     def _is_loc_empty(self, loc: Location) -> bool:
         r""" Returns true if the specified location is empty """
-        return self._piece_state[loc.r][loc.c] == Printer.EMPTY_LOCATION
+        return self._get_piece(loc) == Printer.EMPTY_LOCATION
 
-    def delete_piece(self, loc: Location):
+    def delete_piece(self, loc: Location) -> None:
         r""" Deletes piece at the specified location """
         assert not self._is_loc_empty(loc), "Tried to delete piece that does not exist"
-        self._piece_state[loc.r][loc.c] = Printer.EMPTY_LOCATION
+        self._set_piece(loc, Printer.EMPTY_LOCATION)
 
-    def move_piece(self, orig: Location, new: Location):
+    def move_piece(self, orig: Location, new: Location) -> None:
         r"""
         Moves piece from \p orig to \p new.  If \p new has a piece already, that piece is removed
         in the process of the move.
         """
         assert not self._is_loc_empty(orig), "Tried to delete piece that does not exist"
-        self._piece_state[new.r][new.c] = self._piece_state[orig.r][orig.c]
+        self._set_piece(new, self._get_piece(orig))
         self.delete_piece(orig)
+
+    def write(self) -> str:
+        r""" Prints the board to a large string """
+        return self._row_sep.join(["".join(row) for row in self._cells])
 
     def _is_visible(self, color: Color) -> bool:
         r""" Returns True if the piece color is visible """
         return color in self._visible
 
     def _format_piece(self, piece: Piece):
+        r""" Generates the string for a piece to appear in the output """
+        # white_fg = fg(255, 255, 255)
+        white_fg = fg.li_white
         return "".join([rs.all,
-                        bg.red if piece.color == Color.RED else bg.blue,
-                        ef.bold, fg.white,  # White writing over the background
-                        str(piece) if self._is_visible(piece.color) else Printer.HIDDEN,
+                        bg.da_red if piece.color == Color.RED else bg.blue,
+                        ef.bold, white_fg,  # White writing over the background
+                        str(piece.rank) if self._is_visible(piece.color) else Printer.HIDDEN,
                         rs.all  # Go back to normal printing
-        ])
-
-
-class _Console:
-    r"""
-    Colors class:reset all colors with colors.reset;
-
-    two  sub classes fg for foreground
-    and bg for background; use as colors.subclass.colorname.
-    i.e. colors.fg.red or colors.bg.green
-
-    also, the generic bold, disable, underline, reverse, strike through,
-    and invisible work with the main class i.e. colors.bold
-
-    Source: https://www.geeksforgeeks.org/print-colors-python-terminal/
-    """
-
-    class Color:
-        black = 0
-        red = 1
-        green = 2
-        orange = 3
-        blue = 4
-        purple = 5
-        cyan = 6
-        lightgrey = 7
-
-    @staticmethod
-    def _print(cmd: Union[int, str]) -> str:
-        r""" Standardizes the """
-        return "".join(["\033[", str(cmd), "m"])
-
-    reset = _print("0")
-    bold = _print("01")
-    disable = _print("02")
-    underline = _print("04")
-    reverse = _print("07")
-    invisible = _print("08")
-    strikethrough = _print("09")
-
-    @staticmethod
-    def fg(color: _Console.Color):
-
-    class BG:
-        @staticmethod
-        def _print(cmd: Union[int, str]) -> str:
-            r""" Standardizes the """
-            return "".join(["\033[", str(cmd), "m"])
-
-        black = '\033[40m'
-        red = '\033[41m'
-        green = '\033[42m'
-        orange = '\033[43m'
-        blue = '\033[44m'
-        purple = '\033[45m'
-        cyan = '\033[46m'
-        lightgrey = '\033[47m'
+                        ])

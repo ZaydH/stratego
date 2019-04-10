@@ -1,5 +1,5 @@
 import logging
-from typing import Set
+from typing import Set, Generator
 
 from .location import Location
 from .piece import Color, Piece, Rank
@@ -35,6 +35,11 @@ class Player:
         set_locs = set(self._locs.keys())
         assert len(set_locs) == len(self._pieces)
         return set_locs
+
+    def pieces(self) -> Generator[Piece, None, None]:
+        r""" Generator that yields the Player's pieces """
+        for p in self._pieces:
+            yield p
 
     def verify_piece_set(self, piece_set: Board.PieceSet) -> bool:
         r"""
