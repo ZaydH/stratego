@@ -57,7 +57,8 @@ class Game:
 
         self._brd = Board.importer(board_path)
         self._state = State.importer(state_path, self._brd)
-        self._printer = Printer(self._brd, self._state, visibility)
+        self._printer = Printer(self._brd.num_rows, self._brd.num_cols,
+                                self._state.red.pieces(), self._state.blue.pieces(), visibility)
 
     def move(self):
         pass

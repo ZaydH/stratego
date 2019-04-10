@@ -3,10 +3,8 @@ from enum import Enum
 
 from sty import fg, bg, ef, rs  # , RgbFg
 
-from .board import Board
 from .location import Location
 from .piece import Color, Piece
-from .state import State
 
 
 class Printer:
@@ -27,29 +25,32 @@ class Printer:
         BLUE = {Color.BLUE}
         ALL = RED | BLUE
 
-    def __init__(self, brd: Board, state: State, visibility: 'Printer.Visibility'):
+    def __init__(self, num_rows: int, num_cols: int, red_pieces, blue_pieces,
+                 visibility: 'Printer.Visibility'):
         r"""
 
-        :param brd: Board of interest.  (Assumed immutable.)
-        :param state: State of the players.
+        :param num_rows: Number of rows in the board
+        :param num_cols: Number of columns in the board
+        :param red_pieces: Iterable for the set of red pieces
+        :param blue_pieces: Iterable for the set of blue pieces
         :param visibility: Player(s) if any that are visible.
         """
-        self._brd = brd
+        self._n_rows, self._n_cols = num_rows, num_cols
         # Empty board with all pieces blank
         base_row = [Printer.SEP if i == 0 else Printer.EMPTY_LOCATION
-                    for _ in range(self._brd.num_cols) for i in range(0, 2)]
+                    for _ in range(self._n_cols) for i in range(0, 2)]
         base_row.append(Printer.SEP)  # n + 1 separators since one surrounds
         # Add dummy header and footer rows to simplify join
         self._cells = [[""]]
-        self._cells += [copy.copy(base_row) for _ in range(self._brd.num_rows)]
+        self._cells += [copy.copy(base_row) for _ in range(self._n_rows)]
         self._cells.append([""])
 
         self._visible = visibility.value
-        self._row_sep = "".join(["\n", "-".join(["+"] * (self._brd.num_cols + 1)), "\n"])
+        self._row_sep = "".join(["\n", "-".join(["+"] * (self._n_cols + 1)), "\n"])
 
         # Add the existing pieces
-        for plyr in [state.red, state.blue]:
-            for p in plyr.pieces():
+        for pieces in [red_pieces, blue_pieces]:
+            for p in pieces:
                 self._set_piece(p.loc, self._format_piece(p), exist_ok=False)
 
     def _get_piece(self, loc: Location) -> str:
