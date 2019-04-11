@@ -59,9 +59,11 @@ class Rank:
         r""" Accessor for the rank's value """
         return self._val
 
+    # noinspection PyPep8Naming
     @staticmethod
     def MIN() -> int: return 1  # pylint: disable=missing-docstring, invalid-name
 
+    # noinspection PyPep8Naming
     @staticmethod
     def MAX() -> int: return 9  # pylint: disable=missing-docstring,invalid-name
 
@@ -135,7 +137,7 @@ class Piece:
     r""" Per piece analysis """
     def __init__(self, color: Color, rank: Rank, loc: Location):
         self._color = color
-        self._rank = rank if isinstance(rank, Rank) else Rank(rank)
+        self._rank = rank
         self._loc = loc
         self._id = Piece._next_id
         Piece._next_id += 1

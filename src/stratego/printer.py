@@ -5,7 +5,7 @@ import sty
 # from sty import fg, bg, ef, rs, RgbFg
 
 from .location import Location
-from .piece import Color, Piece, Rank
+from .piece import Color, Piece
 
 
 class Printer:
@@ -136,7 +136,8 @@ class Printer:
                         sty.rs.all  # Go back to normal printing
                         ])
 
-    def _impassable_piece(self) -> str:
+    @staticmethod
+    def _impassable_piece() -> str:
         r""" Generates string for a square that is impassable """
         white_bg = sty.bg.li_white
         white_fg = sty.fg.li_white
