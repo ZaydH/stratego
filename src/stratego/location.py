@@ -76,6 +76,19 @@ class Location:
         assert re.match(r"\(\d+,\s*\d+\)", loc_str), "Invalid location string"
         return Location(*[int(x) for x in re.findall(r"\d+", loc_str)])
 
+    def is_inside_board(self, num_rows, num_cols):
+        r""" Returns True if the location is within the board boundaries
+        >>> l = Location(4,4)
+        >>> print(l.is_inside_board(5,5), l.is_inside_board(1,1))
+        True False
+        >>> print(l.is_inside_board(5,1), l.is_inside_board(1,5))
+        False False
+        >>> l = Location(0,0)
+        >>> print(l.is_inside_board(0,0), l.is_inside_board(1,1))
+        False True
+        """
+        return (0 <= self.r < num_rows) and (0 <= self.c < num_cols)
+
     @staticmethod
     def file_example_str() -> str:
         r""" Example displaying how the board file blocked location should appear. """

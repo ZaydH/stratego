@@ -9,7 +9,7 @@ r"""
     :license: MIT, see LICENSE for more details.
 """
 import logging
-from typing import Union
+from typing import Union, Set
 from pathlib import Path
 from enum import Enum
 
@@ -84,6 +84,11 @@ class Board:
     def num_cols(self) -> int:
         r""" Accessor for number of columns on the board """
         return self._cols
+
+    @property
+    def blocked(self) -> Set[Location]:
+        r""" Set of spaces that no piece can enter """
+        return self._blocked
 
     @staticmethod
     # pylint: disable=protected-access
