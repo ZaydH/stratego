@@ -9,7 +9,11 @@ from .board import Board
 class Player:
     r""" Represents one of the two players """
     def __init__(self, color: Color):
+        r"""
+        :param color: Color of the player
+        """
         self._color = color
+
         self._locs = dict()
         self._pieces = set()
 

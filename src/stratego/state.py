@@ -65,6 +65,10 @@ class State:
             elif spl[0] == State.ImporterKeys.piece.value:
                 assert len(spl) == 4, "Invalid number of entries for piece line"
                 p = Piece(Color[spl[1]], Rank(spl[2]), Location.parse(spl[3]))
+                assert p.loc.is_inside_board(brd.num_rows, brd.num_cols), \
+                    "Imported piece location outside board dimensions"
+                assert p.loc not in brd.blocked, "Piece in blocked location"
+
                 plyr = state._red if p.color == Color.RED else state._blue
                 plyr.add_piece(p)
             else:

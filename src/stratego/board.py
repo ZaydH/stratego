@@ -139,6 +139,7 @@ class Board:
         assert brd._is_valid()  # pylint: disable=protected-access
         return brd
 
+    # noinspection PyProtectedMember
     def can_piece_occupy(self, loc: Location) -> bool:
         r"""
         Checks whether a piece could enter the specified location. The location could be illegal
