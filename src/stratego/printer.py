@@ -113,13 +113,13 @@ class Printer:
     def _is_visible(self, color: Color) -> bool:
         r"""
         Returns True if the piece color is visible
-        >>> p = Printer(4,4,{},{},Printer.Visibility.NONE)
+        >>> p = Printer(4,4,{},{},{},Printer.Visibility.NONE)
         >>> print(p._is_visible(Color.RED), p._is_visible(Color.BLUE))
         False False
-        >>> p = Printer(4,4,{},{},Printer.Visibility.RED)
+        >>> p = Printer(4,4,{},{},{},Printer.Visibility.RED)
         >>> print(p._is_visible(Color.RED), p._is_visible(Color.BLUE))
         True False
-        >>> p = Printer(4,4,{},{},Printer.Visibility.ALL)
+        >>> p = Printer(4,4,{},{},{},Printer.Visibility.ALL)
         >>> print(p._is_visible(Color.RED), p._is_visible(Color.BLUE))
         True True
         """
@@ -145,18 +145,3 @@ class Printer:
                         Printer.IMPASSABLE,
                         sty.rs.all  # Go back to normal printing
                         ])
-
-    def _test(self):
-        r"""
-        >>> p = Printer(5, 5, {Piece(Color.RED, Rank(1), Location(2,1))},
-        ...             {Piece(Color.BLUE, Rank(2), Location(3,2))}, Printer.Visibility.RED)
-        >>> print(p._is_loc_empty(Location(0,0)), p._is_loc_empty(Location(3,2)))
-        True False
-        >>> p.move_piece(Location(3,2), Location(2,4))
-        >>> print(p._is_loc_empty(Location(2,4)), p._is_loc_empty(Location(3,2)))
-        False True
-        >>> p.delete_piece(Location(2,4))
-        >>> print(p._is_loc_empty(Location(2,4)))
-        True
-        """
-        pass
