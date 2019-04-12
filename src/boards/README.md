@@ -11,5 +11,5 @@ Images from [Stratego.com](stratego.com)
 Standard Board (40pc, 10x10)
 ![Standard Board](standard_board.png)
 
-Small Board (10pc, 10x10)
+Small Board (10pc, 8x8)
 ![Small Board](small_board.png)
