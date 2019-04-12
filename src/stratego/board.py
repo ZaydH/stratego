@@ -177,18 +177,18 @@ class Board:
         if not self.piece_set.has_all_ranks():
             logging.warning("Some ranks missing from the Board's PieceSet")
             res = False
-        # Ensure number of pieces aligns with a complete row for each player
-        for row, inc in ((0, 1), (self.num_rows - 1, -1)):
-            rem_count = self.piece_set.tot_count
-            while rem_count > 0 and 0 <= row < self.num_rows:
-                for col in range(0, self.num_cols):
-                    if Location(row, col) not in self._blocked:
-                        rem_count -= 1
-                row += inc
-            if rem_count != 0:
-                logging.warning("Piece count does not align with number of rows")
-                res = False
-                break
+        # # Ensure number of pieces aligns with a complete row for each player
+        # for row, inc in ((0, 1), (self.num_rows - 1, -1)):
+        #     rem_count = self.piece_set.tot_count
+        #     while rem_count > 0 and 0 <= row < self.num_rows:
+        #         for col in range(0, self.num_cols):
+        #             if Location(row, col) not in self._blocked:
+        #                 rem_count -= 1
+        #         row += inc
+        #     if rem_count != 0:
+        #         logging.warning("Piece count does not align with number of rows")
+        #         res = False
+        #         break
         return res
 
     @staticmethod
