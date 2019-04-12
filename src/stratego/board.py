@@ -52,8 +52,17 @@ class Board:
             self._counts[rank] = count
             self._n += count
 
-        def get_rank_count(self, rank: Rank) -> int:
-            r""" Accessor for number of pieces of the specified rank """
+        def get_rank_count(self, rank: Union[int, str, Rank]) -> int:
+            r"""
+            Accessor for number of pieces of the specified rank
+
+            :param rank: Piece rank for which to get the count.  If \p rank is of type \p int or
+                         \p str, the \p Rank constructor will be called on that object and the
+                         result used.
+            """
+            if isinstance(rank, (int, str)):
+                rank = Rank(rank)
+
             assert rank in self._counts, "Getting rank count but not set"
             return self._counts[rank]
 
@@ -176,6 +185,9 @@ class Board:
         # Make sure no piece was excluded from the board file
         if not self.piece_set.has_all_ranks():
             logging.warning("Some ranks missing from the Board's PieceSet")
+            res = False
+        if self.piece_set.get_rank_count(Rank.FLAG) != 1:
+            logging.error("Each player can only have exactly one flag")
             res = False
         # # Ensure number of pieces aligns with a complete row for each player
         # for row, inc in ((0, 1), (self.num_rows - 1, -1)):

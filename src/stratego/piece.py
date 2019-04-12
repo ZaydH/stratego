@@ -84,7 +84,8 @@ class Rank:
         >>> print(p1 == p1, p1 == b, s == p1)
         True False False
         """
-        assert self.value != Rank.FLAG and self.value != Rank.BOMB, "Attacker cant be stationary"
+        # Removed this check since it would affect searching in sets/dictionaries
+        # assert self.value != Rank.FLAG and self.value != Rank.BOMB, "Attacker cant be stationary"
         return self.value == other.value
 
     def __gt__(self, other: 'Rank') -> bool:

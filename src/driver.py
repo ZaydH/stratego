@@ -6,7 +6,7 @@ from stratego.printer import Printer
 
 def _main():
     setup_logger()
-    game = Game("boards/standard.txt", "states/debug.txt", visibility=Printer.Visibility.ALL)
+    game = Game("boards/small.txt", "states/small_debug.txt", visibility=Printer.Visibility.ALL)
     game.display_current()
 
 

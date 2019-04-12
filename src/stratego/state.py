@@ -90,6 +90,9 @@ class State:
             if not plyr.verify_piece_set(self._brd.piece_set):
                 logging.error("Player %s has invalid piece information", plyr.color.name)
                 res = False
+            if not plyr.has_flag():
+                logging.error("Player %s does not have a flag. A flag is required", plyr.color.name)
+                res = False
 
         return res
 

@@ -34,6 +34,11 @@ class Player:
         r""" Remove \p piece from the \p Player's set of pieces """
         self._pieces.remove(piece)
 
+    def has_flag(self) -> bool:
+        r""" Returns True if the player has a flag """
+        flag = Rank(Rank.FLAG)
+        return any(p.rank == flag for p in self._pieces)
+
     def piece_locations(self) -> Set[Location]:
         r""" Location of all of the \p Player's pieces """
         set_locs = set(self._locs.keys())
