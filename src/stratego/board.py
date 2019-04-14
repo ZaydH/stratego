@@ -17,6 +17,36 @@ from .piece import Rank
 from .location import Location
 
 
+class ToEdgeLists:
+    UP = 0
+    RIGHT = 1
+    DOWN = 2
+    LEFT = 3
+
+    r""" Contains the two edge lists for a location"""
+    def __init__(self, loc: Location):
+        r"""
+        :param loc: Stores the location the "to edge list" applies
+        """
+        self.loc = loc
+        self.up = None
+        self.right = None
+        self.down = None
+        self.left = None
+
+    def __iter__(self):
+        for attr in [self.up, self.right, self.down, self.left]:
+            yield attr
+
+    def set(self, dir: int, to_edge_list: List[Location]) -> None:
+        if dir == ToEdgeLists.UP: self.up = to_edge_list
+        elif dir == ToEdgeLists.RIGHT: self.right = to_edge_list
+        elif dir == ToEdgeLists.DOWN: self.down = to_edge_list
+        elif dir == ToEdgeLists.LEFT: self.left = to_edge_list
+        else:
+            raise ValueError("Unknown direction to set")
+
+
 class Board:
     r""" Encapsulates the default board and piece information for the Stratego board """
     SEP = "|"
@@ -212,28 +242,27 @@ class Board:
         """
         return 0 <= l.r < self.num_rows and 0 <= l.c < self.num_cols and l not in self.blocked
 
-    def to_edge_lists(self, loc: Location) -> List[List[Location]]:
+    def to_edge_lists(self, loc: Location) -> ToEdgeLists:
         r"""
         Find the locations relative to \p loc that go to the first object up, right, down, and left.
         This is intended for use by scout pieces.
 
         :param loc: \p Location of interest
-        :return: \p List of \p List of \p Location objects from \p loc to edge of the board or first
-                 blocked square, whichever comes first.  Order is up, right, down, and left
-                 respectively.
+        :return: To edge lists for each direction
         """
-        e_lists = []
+        e_lists = ToEdgeLists(loc)
         # Order is up, right, down, and left respectively
-        for row_diff, col_diff in [(1, 0), (0, 1), (-1, 0), (0, -1)]:
+        mv_list = [(ToEdgeLists.UP, (-1, 0)), (ToEdgeLists.RIGHT, (0, 1)),
+                   (ToEdgeLists.DOWN, (1, 0)), (ToEdgeLists.LEFT, (0, -1))]
+        for mv_dir, (row_diff, col_diff) in mv_list:
             lst = [loc]
             while True:
                 new = lst[-1].relative(row_diff, col_diff)
                 # Stop at first block
                 if not self.is_inside(new): break
                 lst.append(new)
-            e_lists.append(lst[1:])
+            e_lists.set(mv_dir, lst[1:])
         return e_lists
-
 
     @staticmethod
     def _print_template_file(file_path: Union[Path, str]) -> None:

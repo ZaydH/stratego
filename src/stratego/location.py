@@ -96,7 +96,7 @@ class Location:
 
     def relative(self, row_diff: int = None, col_diff: int = None):
         r"""
-        Construct a relative location.  Verifies that the specified row and column are non-negative.
+        Construct a relative location.
 
         :param row_diff: Difference between the implicit object's row.  If not specified, treated
                          as zero.
@@ -105,8 +105,8 @@ class Location:
         """
         r = self._r + (row_diff if row_diff is not None else 0)
         c = self._c + (col_diff if col_diff is not None else 0)
-        assert r >= 0, "Row cannot be negative"
-        assert c >= 0, "Column cannot be negative"
+        # assert r >= 0, "Row cannot be negative"
+        # assert c >= 0, "Column cannot be negative"
         return Location(r, c)
 
     def is_inside_board(self, num_rows, num_cols):
