@@ -102,3 +102,20 @@ class Move:
             logging.warning("Trying to move an immobile piece")
             return False
         return True
+
+
+class MoveStack:
+    r""" Checks for cyclic moves """
+    def __init__(self):
+        self._buf = []
+
+    def pop(self) -> Move:
+        assert self._buf, "Move stack empty"
+        return self._buf.pop()
+
+    def append(self, value: Move) -> None:
+        return self._buf.append(value)
+
+    def is_cyclic(self, move: Move) -> bool:
+        # ToDo implement is_cyclic check
+        return False

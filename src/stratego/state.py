@@ -27,7 +27,7 @@ class State:
         self._red = Player(Color.RED)
         self._blue = Player(Color.BLUE)
 
-        self._printer = None
+        self._printer = None  # type: Printer
 
     @property
     def next_color(self) -> Color:
@@ -111,8 +111,7 @@ class State:
 
         # Check no duplicate locations. Intersection of the sets means a duplicate
         if self._red.piece_locations() & self._blue.piece_locations() != set():
-            logging.error("Duplicate piece locations")
-            res = False
+            raise ValueError("Duplicate piece locations")
 
         # Check pieces conform to PieceSet field in Board class
         for plyr in [self._red, self._blue]:
@@ -168,14 +167,14 @@ class State:
 
         # Delete the piece being moved
         self._printer.delete_piece(move.orig)
-        mv_plyr.delete_piece_info(move.piece)
+        other = self.get_other_player(mv_plyr)
+        mv_plyr.delete_piece_info(move.piece, other)
 
         # Process the attack (if applicable)
         if move.is_attack():
             self._do_attack(move)
 
         # Regardless of whether move or attack, location information of moving piece needs update
-        other = self.get_other_player(mv_plyr)
         mv_plyr.delete_moveset_info(move.orig, other)
         other.delete_moveset_info(move.orig, mv_plyr)
 
@@ -206,7 +205,7 @@ class State:
         other = self.get_player(move.attacked.color)
         # May need to delete the attacked piece's info
         self._printer.delete_piece(move.new)
-        other.delete_piece_info(move.attacked)
+        other.delete_piece_info(move.attacked, self.next_player)
         other.delete_moveset_info(move.new, self.get_other_player(other))
 
     def _do_piece_movement(self, move: Move):

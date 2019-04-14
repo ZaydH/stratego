@@ -48,6 +48,26 @@ class MoveSet:
         :param locs: Location of the player pieces
         :param other_locs: Location of pieces of other player
         """
+        self._process_piece(piece, locs, other_locs, add=True)
+
+    def del_piece(self, piece: Piece, locs: dict, other_locs: dict):
+        r"""
+        Add a piece's moves to the MoveSet
+        :param piece: Piece whose moves (if any) will be added
+        :param locs: Location of the player pieces
+        :param other_locs: Location of pieces of other player
+        """
+        self._process_piece(piece, locs, other_locs, add=False)
+
+    def _process_piece(self, piece: Piece, locs: dict, other_locs: dict, add: bool):
+        r"""
+        Standardizes adding/removing a piece since same algorithm with minor change.
+
+        :param piece: Piece to process
+        :param locs: Location for pieces of same color as \p Piece
+        :param other_locs: Location for other player's pieces
+        :param add: If True, add the piece, otherwise remove the piece
+        """
         # Verify color is same for all pieces
         assert piece.color == self._color, "Piece set has pieces of different colors"
 
@@ -59,14 +79,21 @@ class MoveSet:
             for loc in piece.loc.neighbors():
                 # Ignore pieces not allowed by board or where piece of same color
                 if not self._brd.is_inside(loc) or loc in locs: continue
-                self._add_move(piece, loc)
+
+                if add:
+                    self._add_move(piece, loc)
+                else:
+                    self._del_move(piece, loc)
         # Check scout pieces specially
         else:
             for direction_list in self._brd.to_edge_lists(piece.loc):
                 for loc in direction_list:
                     # If scout blocked by board location or same color, immediately stop
                     if not self._brd.is_inside(loc) or loc in locs: break
-                    self._add_move(piece, loc)
+                    if add:
+                        self._add_move(piece, loc)
+                    else:
+                        self._del_move(piece, loc)
                     if loc in other_locs: break
 
     def _add_move(self, p: Piece, other: Location) -> None:
@@ -205,10 +232,11 @@ class Player:
         self._pieces.add(piece)
         self._locs[piece.loc] = piece
 
-    def delete_piece_info(self, piece: Piece) -> None:
+    def delete_piece_info(self, piece: Piece, other: 'Player') -> None:
         r""" Remove \p piece from the \p Player's set of pieces """
         self._pieces.remove(piece)
         del self._locs[piece.loc]
+        self.move_set.del_piece(piece, self._locs, other._locs)
 
     def delete_moveset_info(self, loc: Location, other: 'Player') -> None:
         r""" Update the MoveSet information after deleting a piece at Location \p loc """
