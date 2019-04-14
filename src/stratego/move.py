@@ -1,12 +1,18 @@
 import logging
 from typing import Optional
 
+from .board import Board
 from .location import Location
 from .piece import Piece, Rank
 
 
 class Move:
     _brd = None
+
+    @staticmethod
+    def set_board(brd: Board) -> None:
+        r""" Specify the \p Board object to be used for verifying moves """
+        Move._brd = brd
 
     def __init__(self, p: Piece, orig: Location, new: Location, attacked: Optional[Piece] = None):
         r"""
@@ -32,7 +38,12 @@ class Move:
         self._piece, self._attacked = p, attacked
         self._orig, self._new = orig, new
 
-        self._verify()
+        self.verify()
+
+    @property
+    def piece(self) -> Piece:
+        r""" Accessor for the piece to be moved """
+        return self._piece
 
     @staticmethod
     def _is_valid_loc(loc: Location):
@@ -42,7 +53,7 @@ class Move:
             return True
         return Move._brd.is_inside(loc)
 
-    def _verify(self):
+    def verify(self):
         r""" Simple verifier that the movement is valid """
         assert self._orig != self._new, "Piece cannot move to the same location"
 

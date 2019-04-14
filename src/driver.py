@@ -1,5 +1,6 @@
-from stratego import Game, setup_logger
+from stratego import Game
 from stratego.printer import Printer
+from stratego.utils import setup_logger
 
 # ToDo Add argparse
 

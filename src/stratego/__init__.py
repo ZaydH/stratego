@@ -8,59 +8,42 @@ r"""
     :copyright: (c) 2019 by Steven Walton and Zayd Hammoudeh.
     :license: MIT, see LICENSE for more details.
 """
-import logging
-import sys
 from pathlib import Path
 from typing import Union
 
 # import matplotlib
+from .move import Move
 from .board import Board
 from .printer import Printer
 from .state import State
-
-
-def setup_logger(quiet_mode: bool = False, filename: str = "test.log",
-                 log_level: int = logging.DEBUG):
-    r"""
-    Logger Configurator
-
-    Configures the test logger.
-
-    :param quiet_mode: True if quiet mode (i.e., disable logging to stdout) is used
-    :param filename: Log file name
-    :param log_level: Level to log
-    """
-    date_format = '%m/%d/%Y %I:%M:%S %p'  # Example Time Format - 12/12/2010 11:46:36 AM
-    format_str = '%(asctime)s -- %(levelname)s -- %(message)s'
-    logging.basicConfig(filename=filename, level=log_level, format=format_str, datefmt=date_format)
-
-    # Also print to stdout
-    if not quiet_mode:
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setLevel(log_level)
-        formatter = logging.Formatter(format_str)
-        handler.setFormatter(formatter)
-        logging.getLogger().addHandler(handler)
-
-    # Matplotlib clutters the logger so change its log level
-    # noinspection PyProtectedMember
-    # matplotlib._log.setLevel(logging.INFO)  # pylint: disable=protected-access
-
-    logging.info("******************* New Run Beginning *****************")
 
 
 class Game:
     r""" Encapsulates an active Stratego game """
     def __init__(self, board_path: Union[Path, str], state_path: Union[Path, str],
                  visibility: Printer.Visibility):
+        r"""
+        :param board_path: Path to the file specifying the board
+        :param state_path: Path to the file specifying the game state
+        :param visibility: Specifies whose pieces are visible
+        """
         if isinstance(state_path, str): state_path = Path(state_path)
 
         self._brd = Board.importer(board_path)
-        self._state = State.importer(state_path, self._brd)
-        self._printer = Printer(self._brd.num_rows, self._brd.num_cols, self._brd.blocked,
-                                self._state.red.pieces(), self._state.blue.pieces(), visibility)
+        Move.set_board(self._brd)
 
-    def move(self):
+        self._state = State.importer(state_path, self._brd)
+        self._printer = Printer(self._brd, self._state.red.pieces(),
+                                self._state.blue.pieces(), visibility)
+
+    def move(self, m: Move) -> None:
+        r"""
+
+        :param m: Move to perform
+        """
+        assert m.verify()
+        assert m.piece.color == self._state.next_player(), "Not player's turn to move"
+        # ToDo Ensure update accounts for blocked scout moves
         pass
 
     def display_current(self):

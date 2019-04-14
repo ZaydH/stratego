@@ -9,7 +9,7 @@ r"""
     :license: MIT, see LICENSE for more details.
 """
 import logging
-from typing import Set, Union
+from typing import List, Set, Union
 from pathlib import Path
 from enum import Enum
 
@@ -211,6 +211,29 @@ class Board:
         :return: True if \p is inside the board dimensions
         """
         return 0 <= l.r < self.num_rows and 0 <= l.c < self.num_cols and l not in self.blocked
+
+    def to_edge_lists(self, loc: Location) -> List[List[Location]]:
+        r"""
+        Find the locations relative to \p loc that go to the first object up, right, down, and left.
+        This is intended for use by scout pieces.
+
+        :param loc: \p Location of interest
+        :return: \p List of \p List of \p Location objects from \p loc to edge of the board or first
+                 blocked square, whichever comes first.  Order is up, right, down, and left
+                 respectively.
+        """
+        e_lists = []
+        # Order is up, right, down, and left respectively
+        for row_diff, col_diff in [(1, 0), (0, 1), (-1, 0), (0, -1)]:
+            lst = [loc]
+            while True:
+                new = lst[-1].relative(row_diff, col_diff)
+                # Stop at first block
+                if not self.is_inside(new): break
+                lst.append(new)
+            e_lists.append(lst[1:])
+        return e_lists
+
 
     @staticmethod
     def _print_template_file(file_path: Union[Path, str]) -> None:

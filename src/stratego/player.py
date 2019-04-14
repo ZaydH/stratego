@@ -2,8 +2,57 @@ import logging
 from typing import Set, Generator
 
 from .location import Location
+from .move import Move
 from .piece import Color, Piece, Rank
 from .board import Board
+
+
+class MoveSet:
+    brd = None  # type: Board
+
+    r""" Moves available to a player """
+    def __init__(self):
+        self._avail = dict()  # Available moves
+
+    @staticmethod
+    def build(pieces: Set[Piece], locs: dict, other_locs: dict) -> 'MoveSet':
+        r"""
+        Factory method used to construct an initial move set.
+
+        :param pieces: All of the players pieces
+        :param locs: Location of the player pieces
+        :param other_locs: Location of pieces of other player
+        :return: Constructed move set
+        """
+        assert MoveSet.brd is not None, "Board information be present"
+        ms = MoveSet()
+        for p in pieces:
+            # Bombs and flags can be ignored
+            if p.is_immobile(): continue
+            # Check ordinary pieces
+            if p.rank != Rank.scout():
+                for loc in p.loc.neighbors():
+                    # Ignore pieces not allowed by board or where piece of same color
+                    if not ms.brd.is_inside(loc) or loc in locs: continue
+                    ms.add(p, loc)
+            # Check scout pieces specially
+            else:
+                for direction_list in ms.brd.to_edge_lists(p.loc):
+                    for loc in direction_list:
+                        # If scout blocked by board location or same color, immediately stop
+                        if not ms.brd.is_inside(loc) or loc in locs: break
+                        ms.add(p, loc)
+                        if loc in other_locs: break
+        return ms
+
+    def add(self, p: Piece, other: Location) -> None:
+        r""" Add \p piece's move to \p other to the \p MoveSet """
+        key = [self._make_move_key(p.loc, other)]
+        self._avail[key] = Move(p, p.loc, other)
+
+    @staticmethod
+    def _make_move_key(orig: Location, new: Location):
+        return orig, new
 
 
 class Player:
@@ -14,6 +63,7 @@ class Player:
         """
         self._color = color
 
+        self._move_set = None
         self._locs = dict()
         self._pieces = set()
 
@@ -49,6 +99,10 @@ class Player:
         r""" Generator that yields the Player's pieces """
         for p in self._pieces:
             yield p
+
+    def build_move_set(self, other: 'Player'):
+        r""" Construct the move set of the """
+        self._move_set = MoveSet.build(self._pieces, self._locs, other._locs)
 
     def verify_piece_set(self, piece_set: Board.PieceSet) -> bool:
         r"""
