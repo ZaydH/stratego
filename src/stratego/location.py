@@ -69,6 +69,14 @@ class Location:
         """
         return abs(self.r - other.r), abs(self.c - other.c)
 
+    def neighbors(self) -> 'Tuple[Location, Location, Location, Location]':
+        r"""
+        Neighboring locations of the piece
+
+        :return: Tuple of the neighbors in the order: up, right, down, and left respectively
+        """
+        return self.up(), self.right(), self.down(), self.left()
+
     @staticmethod
     def parse(loc_str: str) -> 'Location':
         r"""
@@ -85,6 +93,21 @@ class Location:
         """
         assert re.match(r"\(\d+,\s*\d+\)", loc_str), "Invalid location string"
         return Location(*[int(x) for x in re.findall(r"\d+", loc_str)])
+
+    def relative(self, row_diff: int = None, col_diff: int = None):
+        r"""
+        Construct a relative location.  Verifies that the specified row and column are non-negative.
+
+        :param row_diff: Difference between the implicit object's row.  If not specified, treated
+                         as zero.
+        :param col_diff: Difference between the implicit object's column.  If not specified, treated
+                         as zero.
+        """
+        r = self._r + (row_diff if row_diff is not None else 0)
+        c = self._c + (col_diff if col_diff is not None else 0)
+        assert r >= 0, "Row cannot be negative"
+        assert c >= 0, "Column cannot be negative"
+        return Location(r, c)
 
     def is_inside_board(self, num_rows, num_cols):
         r""" Returns True if the location is within the board boundaries

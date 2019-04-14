@@ -1,3 +1,4 @@
-typing==3.6.6
+pytest=4.4.0
 setuptools==39.0.1
 sty==1.0.0b9
+typing==3.6.6

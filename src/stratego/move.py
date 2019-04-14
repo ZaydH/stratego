@@ -25,7 +25,7 @@ class Move:
             raise ValueError("Invalid piece to be moved")
 
         # ZSH - This check should be correct but may need to be revisited
-        assert attacked is None or attacked.loc == attacked, "Location of attacked mismatch"
+        assert attacked is None or attacked.loc == new, "Location of attacked mismatch"
         if attacked is not None and p.color == attacked.color:
             raise ValueError("Attacking and attacked pieces cannot be of the same color")
 
@@ -50,7 +50,8 @@ class Move:
         assert r_diff == 0 or c_diff == 0, "Diagonal moves never allowed"
 
         man_dist = r_diff + c_diff  # Manhattan distance
-        assert man_dist == 1 or self._piece.rank == Rank.scout()
+        msg = "Only scout can move multiple squares"
+        assert man_dist == 1 or self._piece.rank == Rank.scout(), msg
 
     @staticmethod
     def _is_valid_piece(piece: Piece):
@@ -62,5 +63,3 @@ class Move:
             logging.warning("Trying to move an immobile piece")
             return False
         return True
-
-

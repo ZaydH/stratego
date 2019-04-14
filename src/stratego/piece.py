@@ -33,6 +33,7 @@ class Rank:
     SPY = 'S'
     BOMB = 'B'
     FLAG = 'F'
+
     MARSHALL = 1
     MINER = 8
     SCOUT = 9
@@ -71,8 +72,13 @@ class Rank:
 
     @staticmethod
     def marshall() -> 'Rank':
-        r""" Accessor for the "Flag" rank """
+        r""" Accessor for the "Marshall" rank """
         return Rank._static_piece(Rank.MARSHALL)
+
+    @staticmethod
+    def miner() -> 'Rank':
+        r""" Accessor for the "Miner" rank """
+        return Rank._static_piece(Rank.MINER)
 
     @staticmethod
     def scout() -> 'Rank':
