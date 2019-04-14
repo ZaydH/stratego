@@ -37,14 +37,17 @@ class Printer:
         """
         self._brd = brd
 
-        self._cells = [""]
-        base_row = ["\n"] + [Printer.EMPTY_LOCATION for _ in range(self._brd.num_cols)] + ["\n"]
-        for _ in range(self._brd.num_rows):
+        # Needs to be a list of list since later join in write function
+        self._cells = [[" ".join(["  "] + [str(i) for i in range(self._brd.num_cols)] + ["\n"])]]
+        # Construct list elements that will hold piece info
+        base_row = [""] + [Printer.EMPTY_LOCATION for _ in range(self._brd.num_cols)] + ["\n"]
+        for i in range(self._brd.num_rows):
             self._cells.append(copy.copy(base_row))
+            self._cells[-1][0] = '\n{:2d}'.format(i)
         self._cells.append([""])
 
         self._visible = visibility.value
-        self._row_sep = "-".join(["+"] * (self._n_cols + 1))
+        self._row_sep = "".join(["  ", "-".join(["+"] * (self._n_cols + 1))])
 
         # Fill in the locations that cannot be entered
         impass_str = self._impassable_piece()
