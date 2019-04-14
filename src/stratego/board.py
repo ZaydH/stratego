@@ -203,6 +203,15 @@ class Board:
         #         break
         return res
 
+    def is_inside(self, l: Location) -> bool:
+        r"""
+        Checks whether the specified location is inside the board
+
+        :param l: Location to check
+        :return: True if \p is inside the board dimensions
+        """
+        return 0 <= l.r < self.num_rows and 0 <= l.c < self.num_cols and l not in self.blocked
+
     @staticmethod
     def _print_template_file(file_path: Union[Path, str]) -> None:
         r"""

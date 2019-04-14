@@ -2,8 +2,8 @@ import copy
 from enum import Enum
 
 import sty
-# from sty import fg, bg, ef, rs, RgbFg
 
+from .board import Board
 from .location import Location
 from .piece import Color, Piece
 
@@ -27,19 +27,19 @@ class Printer:
         BLUE = {Color.BLUE}
         ALL = RED | BLUE
 
-    def __init__(self, num_rows: int, num_cols: int, impassable, red_pieces, blue_pieces,
+    def __init__(self, brd: Board, red_pieces, blue_pieces,
                  visibility: 'Printer.Visibility'):
         r"""
-        :param num_rows: Number of rows in the board
-        :param num_cols: Number of columns in the board
-        :param impassable: Set of board locations not passable by either player
+        :param brd: Board information.
         :param red_pieces: Iterable for the set of red pieces
         :param blue_pieces: Iterable for the set of blue pieces
         :param visibility: Player(s) if any that are visible.
         """
+        self._brd = brd
+
         self._cells = [""]
-        base_row = ["\n"] + [Printer.EMPTY_LOCATION for _ in range(num_cols)] + ["\n"]
-        for _ in range(num_rows):
+        base_row = ["\n"] + [Printer.EMPTY_LOCATION for _ in range(self._brd.num_cols)] + ["\n"]
+        for _ in range(self._brd.num_rows):
             self._cells.append(copy.copy(base_row))
         self._cells.append([""])
 
@@ -49,9 +49,10 @@ class Printer:
         # Fill in the locations that cannot be entered
         self._impassable = {}  # Set dummy value to prevent assertion error
         impass_str = self._impassable_piece()
-        for l in impassable:
+        for l in self._brd.blocked:
             self._set_piece(l, impass_str)
-        self._impassable = impassable  # Must set after setting cell values to prevent assertion err
+        # Must set after setting cell values to prevent assertion err
+        self._impassable = self._brd.blocked
 
         # Add the existing pieces
         for pieces in [red_pieces, blue_pieces]:
@@ -84,8 +85,7 @@ class Printer:
 
     def _verify_piece_loc(self, loc: Location) -> None:
         r""" Verifies whether the piece location is inside the board boundaries"""
-        assert loc.is_inside_board(self._n_rows, self._n_cols), "Location outside board dimensions"
-        assert loc not in self._impassable, "Trying to get an impassable piece"
+        assert self._brd.is_inside(loc), "Invalid location in board"
 
     def _is_loc_empty(self, loc: Location) -> bool:
         r""" Returns true if the specified location is empty """

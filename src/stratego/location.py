@@ -9,6 +9,7 @@ r"""
     :license: MIT, see LICENSE for more details.
 """
 import re
+from typing import Tuple
 
 
 class Location:
@@ -58,6 +59,15 @@ class Location:
         True True
         """
         return Location(self.r, self.c + 1)
+
+    def diff(self, other: 'Location') -> Tuple[int, int]:
+        r"""
+        Calculates the row and column differences respectively
+
+        :param other: \p Location to compare against
+        :return: Tuple of the magnitude of distance in rows and columns respectively
+        """
+        return abs(self.r - other.r), abs(self.c - other.c)
 
     @staticmethod
     def parse(loc_str: str) -> 'Location':
