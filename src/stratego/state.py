@@ -27,6 +27,7 @@ class State:
         self._red = Player(Color.RED)
         self._blue = Player(Color.BLUE)
 
+        # noinspection PyTypeChecker
         self._printer = None  # type: Printer
 
     @property
@@ -199,7 +200,9 @@ class State:
         Process the attack for all data structures in the \p State.  The move is handled separately
         :param move: Attack move
         """
-        if move.piece.rank < move.attacked.rank:
+        # Do not use < compare since this will cause runtime error because of how __gt__ checks
+        # ranks for stationary pieces
+        if move.piece.rank != move.attacked.rank and not move.is_attack_successful():
             return
 
         other = self.get_player(move.attacked.color)

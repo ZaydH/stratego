@@ -148,7 +148,7 @@ class Rank:
         >>> print(p8 > b, p1 > b)
         True False
         """
-        assert self.value != Rank.FLAG and self.value != Rank.BOMB, "Attacker cant be stationry"
+        assert self.value != Rank.FLAG and self.value != Rank.BOMB, "Attacker cant be stationary"
         if other.value == Rank.FLAG:
             return True
         if self.value == Rank.SPY:

@@ -45,7 +45,30 @@ def test_state_moves():
     assert state.blue.num_pieces == 7
     assert len(state.blue.move_set) == 4 + 3  # Blocked scout
 
-    move_list = [((0, 1), (1, 1), 7, 7, 12, 7)]
+    # Define a series of moves.  Entries in each tuple are:
+    #   0: Original piece location
+    #   1: Piece new location
+    #   2: Number of red pieces
+    #   3: Number of blue pieces
+    #   4: Size of the red move set
+    #   %: Size of the blue move set
+    move_list = [((0, 1), (1, 1), 7, 7, 12, 7),
+                 ((9, 1), (8, 1), 7, 7, 12, 12),
+                 ((1, 1), (2, 1), 7, 7, 12, 12),
+                 ((8, 1), (7, 1), 7, 7, 12, 12),
+                 ((2, 1), (3, 1), 7, 7, 12, 12),
+                 ((7, 1), (6, 1), 7, 7, 12, 12),
+                 ((3, 1), (4, 1), 7, 7, 11, 12),  # One less due to blocked by (4, 2)
+                 ((6, 1), (5, 1), 7, 7, 11, 11),  # One less due to blocked by (5, 2)
+                 ((4, 1), (5, 1), 6, 6, 8, 8),  # Both lost piece in battle
+                 ((9, 3), (6, 3), 6, 6, 8, 18),  # Move blue scout
+                 ((0, 3), (3, 3), 6, 6, 18, 18),  # Move red scout
+                 ((6, 3), (6, 5), 6, 6, 18, 23),  # Move blue scout
+                 ((3, 3), (3, 5), 6, 6, 20, 20),  # Move red scout
+                 ((6, 5), (6, 4), 6, 6, 23, 23),  # Move blue scout
+                 ((3, 5), (9, 5), 6, 5, 16, 22),  # Red scout attack blue spy
+                 ((6, 4), (0, 4), 6, 4, 16, 5)  # Blue scout attack red bomb
+                 ]
     for orig, new, num_red_p, num_blue_p, num_red_mv, num_blue_mv in move_list:
         orig, new = Location(orig[0], orig[1]), Location(new[0], new[1])
         p = state.next_player.get_piece_at_loc(orig)
@@ -60,3 +83,13 @@ def test_state_moves():
         assert len(state.red.move_set) == num_red_mv
         assert state.blue.num_pieces == num_blue_p
         assert len(state.blue.move_set) == num_blue_mv
+
+    # Try to move red bomb then the red flag
+    for orig in [Location(0, 4), Location(0, 6)]:
+        p = state.next_player.get_piece_at_loc(orig)
+        assert p is not None
+        for new in [orig.left(), orig.right]:
+            attacked = state.get_other_player(state.next_player).get_piece_at_loc(new)
+
+            with pytest.raises(Exception):
+                Move(p, orig, new, attacked)
