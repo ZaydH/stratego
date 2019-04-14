@@ -9,9 +9,10 @@ r"""
     :license: MIT, see LICENSE for more details.
 """
 from pathlib import Path
-from typing import Union
+from typing import Union, Tuple
 
 # import matplotlib
+from stratego.location import Location
 from .move import Move
 from .board import Board
 from .printer import Printer
@@ -34,15 +35,27 @@ class Game:
 
         self._state = State.importer(state_path, self._brd, visibility)
 
-    def move(self, m: Move) -> None:
+    def move(self, cur_loc: Tuple[int, int], new_loc: Tuple[int, int]) -> bool:
         r"""
+        Move the piece at \p cur_loc to \p new_loc
 
-        :param m: Move to perform
+        :param cur_loc: Location of the current piece
+        :param new_loc: New location for the piece at \p cur_loc
+        :return: True if the move was successful
         """
-        assert m.verify()
-        assert m.piece.color == self._state.next_color, "Not player's turn to move"
-        # ToDo Ensure update accounts for blocked scout moves
-        pass
+        orig, new = Location(cur_loc[0], cur_loc[1]), Location(new_loc[0], new_loc[1])
+        p = self._state.next_player.get_piece_at_loc(orig)
+        if p is None:
+            return False
+
+        other = self._state.get_other_player(self._state.next_player)
+        attacked = other.get_piece_at_loc(new)
+        m = Move(p, orig, new, attacked)
+        if not m.verify() or m.piece.color != self._state.next_color:
+            return False
+
+        self._state.update(m)
+        return True
 
     def display_current(self):
         r""" Displays the current state of the game to the console """

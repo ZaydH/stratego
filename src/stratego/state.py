@@ -36,7 +36,7 @@ class State:
 
     def toggle_next_color(self) -> None:
         r""" Accessor for the COLOR of the player whose turn is next """
-        self._next = Color.RED if self._next == Color.RED else Color.BLUE
+        self._next = Color.RED if self._next != Color.RED else Color.BLUE
 
     def get_player(self, color: Color) -> Player:
         r""" Get the color associated with the \p Color """
@@ -151,14 +151,34 @@ class State:
             f_out.write("\n".join([State.SEP.join(line) for line in lines]))
 
     def update(self, move: Move) -> None:
+        r"""
+        Updates the state of the game by perform the move.
+
+        :param move: Move to be performed
+        """
         if move.piece.color != self.next_color:
             raise ValueError("Move piece color does not match the expected next player")
-        # Process the attack
+
+        # Check for illegal cycling
+        mv_plyr = self.get_player(move.piece.color)
+        if not mv_plyr.has_move(move.piece, move.new):
+            raise ValueError("Specified move appears does not appear to be known")
+
+        # Delete the piece being moved
+        self._printer.delete_piece(move.orig)
+        mv_plyr.delete_piece_info(move.piece)
+
+        # Process the attack (if applicable)
         if move.is_attack():
             self._do_attack(move)
+
+        # Regardless of whether move or attack, location information of moving piece needs update
+        other = self.get_other_player(mv_plyr)
+        mv_plyr.delete_moveset_info(move.orig, other)
+        other.delete_moveset_info(move.orig, mv_plyr)
+
         if not move.is_attack() or move.is_attack_successful():
-        # ToDo Ensure update accounts for blocked scout moves
-        assert False
+            self._do_piece_movement(move)
 
         # Switch next player as next
         self.toggle_next_color()
@@ -170,36 +190,39 @@ class State:
         :param plyr: Player whose opposite will be returned
         :return: Red player if \p plyr is blue else the blue player
         """
-        return self.red if plyr.color == self.blue else self.blue
+        return self.red if plyr.color == Color.BLUE else self.blue
 
     def _do_attack(self, move: Move) -> None:
         r"""
         Process the attack for all data structures in the \p State.  The move is handled separately
         :param move: Attack move
         """
-        delete_other = move.is_attack_successful() or move.piece.rank == move.attacked.rank
-        # Update the piece information first
-        grp = [move.piece]  # Attacker always deleted since move or lose
-        # Other piece deleted in tie or successful attack
-        if delete_other: grp.append(move.attacked)
-        for piece in grp:
-            self._printer.delete_piece(piece.loc)
-            plyr = self.red if piece.color == Color.RED else self.blue
-            plyr.delete_piece_info(piece)
+        if move.piece.rank < move.attacked.rank:
+            return
 
-        # Update MoveSet at attacking piece location
-        for plyr in [self.red, self.blue]:
-            plyr.delete_moveset_info(move.piece.loc, self.get_other_player(plyr))
-        # If the attacked piece is removed, update the moveset
-        if delete_other:
-            other = self.get_player(move.attacked.color)
-            other.delete_moveset_info(move.attacked.loc, self.get_other_player(plyr))
+        other = self.get_player(move.attacked.color)
+        # May need to delete the attacked piece's info
+        self._printer.delete_piece(move.new)
+        other.delete_piece_info(move.attacked)
+        other.delete_moveset_info(move.new, self.get_other_player(other))
 
-    def _do_movement(self, move: Move):
-        assert False
+    def _do_piece_movement(self, move: Move):
+        r"""
+        Perform the state additions needed just related due the piece in \p move's new location.
+        This function is very limited scope and does not handle deleting information from the state.
+        """
+        # Piece is in the new location
+        move.piece.loc = move.new
+        plyr = self.get_player(move.piece.color)
+        plyr.add_piece(move.piece)
+
+        other = self.get_other_player(plyr)
+        plyr.add_moveset_info(move.piece, other)
+        plyr.update_moveset_after_add(move.new, other)
+        other.update_moveset_after_add(move.new, plyr)
+
+        self._printer.add_piece(move.piece)
 
     def write_board(self) -> str:
         r""" Return the board contents as a string """
         return self._printer.write()
-
-

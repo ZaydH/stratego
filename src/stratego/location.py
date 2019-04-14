@@ -109,6 +109,11 @@ class Location:
         # assert c >= 0, "Column cannot be negative"
         return Location(r, c)
 
+    def is_adjacent(self, other: 'Location') -> bool:
+        r""" Return True if the implicit location and \p are directly adjacent """
+        row_diff, col_diff = abs(self.r - other.r), abs(self.c - other.c)
+        return (row_diff == 0 and col_diff == 1) or (row_diff == 1 and col_diff == 0)
+
     def is_inside_board(self, num_rows, num_cols):
         r""" Returns True if the location is within the board boundaries
         >>> l = Location(4,4)

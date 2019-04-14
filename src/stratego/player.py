@@ -1,5 +1,5 @@
 import logging
-from typing import Set, Generator
+from typing import Set, Generator, Optional
 
 from .location import Location
 from .move import Move
@@ -16,8 +16,12 @@ class MoveSet:
         MoveSet._brd = brd
 
     r""" Moves available to a player """
-    def __init__(self):
+    def __init__(self, color: Color):
+        r"""
+        :param color: Color that is making the moves
+        """
         self._avail = dict()  # Available moves
+        self._color = color
 
     @staticmethod
     def build(pieces: Set[Piece], locs: dict, other_locs: dict) -> 'MoveSet':
@@ -30,37 +34,127 @@ class MoveSet:
         :return: Constructed move set
         """
         assert MoveSet._brd is not None, "Board information be present"
-        ms = MoveSet()
+        assert pieces, "Piece set can never be empty"
+        color = next(iter(pieces)).color
+        ms = MoveSet(color)
         for p in pieces:
-            # Bombs and flags can be ignored
-            if p.is_immobile(): continue
-            # Check ordinary pieces
-            if p.rank != Rank.scout():
-                for loc in p.loc.neighbors():
-                    # Ignore pieces not allowed by board or where piece of same color
-                    if not ms._brd.is_inside(loc) or loc in locs: continue
-                    ms.add(p, loc)
-            # Check scout pieces specially
-            else:
-                for direction_list in ms._brd.to_edge_lists(p.loc):
-                    for loc in direction_list:
-                        # If scout blocked by board location or same color, immediately stop
-                        if not ms._brd.is_inside(loc) or loc in locs: break
-                        ms.add(p, loc)
-                        if loc in other_locs: break
+            ms.add_piece(p, locs, other_locs)
         return ms
 
-    def add(self, p: Piece, other: Location) -> None:
+    def add_piece(self, piece: Piece, locs: dict, other_locs: dict):
+        r"""
+        Add a piece's moves to the MoveSet
+        :param piece: Piece whose moves (if any) will be added
+        :param locs: Location of the player pieces
+        :param other_locs: Location of pieces of other player
+        """
+        # Verify color is same for all pieces
+        assert piece.color == self._color, "Piece set has pieces of different colors"
+
+        # Bombs and flags can be ignored
+        if piece.is_immobile():
+            return
+        # Check ordinary pieces
+        if piece.rank != Rank.scout():
+            for loc in piece.loc.neighbors():
+                # Ignore pieces not allowed by board or where piece of same color
+                if not self._brd.is_inside(loc) or loc in locs: continue
+                self._add_move(piece, loc)
+        # Check scout pieces specially
+        else:
+            for direction_list in self._brd.to_edge_lists(piece.loc):
+                for loc in direction_list:
+                    # If scout blocked by board location or same color, immediately stop
+                    if not self._brd.is_inside(loc) or loc in locs: break
+                    self._add_move(piece, loc)
+                    if loc in other_locs: break
+
+    def _add_move(self, p: Piece, other: Location) -> None:
         r""" Add \p piece's move to \p other to the \p MoveSet """
+        assert p.is_scout() or p.loc.is_adjacent(other)
+
         key = self._make_move_key(p.loc, other)
         self._avail[key] = Move(p, p.loc, other)
 
-    def remove(self, loc: Location) -> None:
-        assert False
+    def _del_move(self, p: Piece, other: Location) -> None:
+        r"""
+        Delete the corresponding move from the \p MoveSet
+
+        :param p: Piece whose move will be deleted
+        :param other: Location where \p p will be moved
+        """
+        assert p.is_scout() or p.loc.is_adjacent(other)
+
+        key = self._make_move_key(p.loc, other)
+        del self._avail[key]
+
+    def has_move(self, p: Piece, new_loc: Location) -> bool:
+        r""" Returns True if the \p Piece has an availble move to the specified \p Location """
+        key = self._make_move_key(p.loc, new_loc)
+        return key in self._avail
 
     def __len__(self) -> int:
         r""" Return number of moves in the \p MoveSet """
         return len(self._avail)
+
+    def remove_moves_after_add(self, loc: Location, plyr_locs: dict, other_locs: dict) -> None:
+        r"""
+        Process the adding of a piece at Location \p loc
+
+        :param loc: Location of added piece
+        :param plyr_locs: Location of pieces for same color as \p MoveSet
+        :param other_locs: Location of pieces of other \p Player
+        """
+        self._handle_loc_change(loc, plyr_locs, other_locs, True)
+
+    def add_moves_after_delete(self, loc: Location, plyr_locs: dict, other_locs: dict) -> None:
+        r"""
+        Process the deletion of a piece that was at Location \p loc
+
+        :param loc: Location of deleted piece
+        :param plyr_locs: Location of pieces for same color as \p MoveSet
+        :param other_locs: Location of pieces of other \p Player
+        """
+        self._handle_loc_change(loc, plyr_locs, other_locs, True)
+
+    def _handle_loc_change(self, loc: Location, plyr_locs: dict, other_locs: dict, add: bool):
+        r"""
+        Process a \p Location's state change by either removing or add moves to the MoveSet.
+
+        :param loc: Location whose state is being changed
+        :param plyr_locs: Locations of the implicit player's pieces
+        :param other_locs: Location dictionary for the other player
+        :param add: If True, add moves to the MoveSet.  Otherwise, remove those locations.
+        """
+        el = self._brd.to_edge_lists(loc)
+        el_groups = [(el.right, el.left), (el.left, el.right), (el.up, el.down), (el.down, el.up)]
+
+        for search, opp in el_groups:
+            # Find first piece in search direction (if any)
+            p = None
+            for srch in search:
+                if srch in plyr_locs: p = plyr_locs[srch]
+                elif srch in other_locs: p = other_locs[srch]
+                if p is not None: break
+            # If no piece in search direction
+            if p is None or p.color != self._color or p.is_immobile(): continue
+            # If found p is not a scout and not adjacent, move on
+            if not p.is_scout() and not p.loc.is_adjacent(loc): continue
+
+            if add:
+                self._add_move(p, loc)
+            elif loc in plyr_locs:
+                self._del_move(p, loc)
+
+            if p.is_scout():
+                for srch in opp:
+                    if srch in plyr_locs: break
+
+                    if add: self._add_move(p, loc)
+                    else: self._del_move(p, loc)
+
+                    # Perform second since could still attack
+                    if srch in other_locs: break
 
     @staticmethod
     def _make_move_key(orig: Location, new: Location):
@@ -109,13 +203,39 @@ class Player:
         del self._locs[piece.loc]
 
     def delete_moveset_info(self, loc: Location, other: 'Player') -> None:
-        # ToDo update the MoveSet after deleting a piece
-        assert False
+        r""" Update the MoveSet information after deleting a piece at Location \p loc """
+        assert self._color != other.color
+        self.move_set.add_moves_after_delete(loc, self._locs, other._locs)
+
+    def add_moveset_info(self, piece: Piece, other: 'Player') -> None:
+        r""" Update the MoveSet after adding \p piece """
+        assert self._color != other.color
+        self.move_set.add_piece(piece, self._locs, other._locs)
+
+    def update_moveset_after_add(self, loc: Location, other: 'Player') -> None:
+        r"""
+        When adding a piece (i.e., moving it and placing it back down), some previously valid moves
+        become blocked.  This method updates \p MoveSet to accomodate that.
+        :param loc: \p Location where piece was placed
+        :param other: Other player
+        """
+        assert self._color != other.color
+        self.move_set.remove_moves_after_add(loc, self._locs, other._locs)
 
     def has_flag(self) -> bool:
         r""" Returns True if the player has a flag """
         flag = Rank.flag()
         return any(p.rank == flag for p in self._pieces)
+
+    def get_piece_at_loc(self, loc: Location) -> Optional[Piece]:
+        r""" Returns the piece at the specified location. If no piece is there, returns None """
+        try: return self._locs[loc]
+        except KeyError: return None
+
+    def has_move(self, piece: Piece, new_loc: Location) -> bool:
+        r""" Returns \p True if the player has a move for the piece ot the specified \p Location """
+        assert piece is not None
+        return self.move_set.has_move(piece, new_loc)
 
     def piece_locations(self) -> Set[Location]:
         r""" Location of all of the \p Player's pieces """
@@ -130,6 +250,7 @@ class Player:
 
     def build_move_set(self, other: 'Player'):
         r""" Construct the move set of the """
+        assert self._color != other.color
         self._move_set = MoveSet.build(self._pieces, self._locs, other._locs)
 
     def verify_piece_set(self, piece_set: Board.PieceSet) -> bool:

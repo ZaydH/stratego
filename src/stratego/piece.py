@@ -205,9 +205,13 @@ class Piece:
         r""" Mutator for the piece's location """
         self._loc = loc
 
-    def is_immobile(self) -> True:
+    def is_immobile(self) -> bool:
         r""" Returns True if piece cannot move """
         return self._rank.is_immobile()
+
+    def is_scout(self) -> bool:
+        r""" Returns True if the piece is a scout """
+        return self._rank == Rank.scout()
 
     def __gt__(self, other: 'Piece') -> bool:
         assert self.color != other.color, "Player cannot attack itself"

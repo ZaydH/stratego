@@ -97,14 +97,10 @@ class Printer:
         assert not self._is_loc_empty(loc), "Tried to delete piece that does not exist"
         self._set_piece(loc, Printer.EMPTY_LOCATION)
 
-    def move_piece(self, orig: Location, new: Location) -> None:
-        r"""
-        Moves piece from \p orig to \p new.  If \p new has a piece already, that piece is removed
-        in the process of the move.
-        """
-        assert not self._is_loc_empty(orig), "Tried to delete piece that does not exist"
-        self._set_piece(new, self._get_piece(orig))
-        self.delete_piece(orig)
+    def add_piece(self, piece: Piece) -> None:
+        r""" Add the specified piece to the printer """
+        assert self._is_loc_empty(piece.loc), "Trying to add piece to non-empty location"
+        self._set_piece(piece.loc, self._format_piece(piece))
 
     def write(self) -> str:
         r""" Prints the board to a large string """

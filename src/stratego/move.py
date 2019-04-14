@@ -51,6 +51,16 @@ class Move:
         assert self._attacked is not None
         return self._attacked
 
+    @property
+    def orig(self) -> Location:
+        r""" Accesses the ORIGINAL location of the piece """
+        return self._orig
+
+    @property
+    def new(self) -> Location:
+        r""" Accesses the NEW location of the piece """
+        return self._new
+
     def is_attack(self) -> bool:
         r""" Returns True if this move corresponds to an attack """
         return self._attacked is not None
@@ -67,16 +77,23 @@ class Move:
             return True
         return Move._brd.is_inside(loc)
 
-    def verify(self):
+    def verify(self) -> bool:
         r""" Simple verifier that the movement is valid """
-        assert self._orig != self._new, "Piece cannot move to the same location"
+        res = True
+        if self._orig == self._new:
+            logging.warning("Piece cannot move to the same location")
+            res = False
 
         r_diff, c_diff = self._orig.diff(self._new)
-        assert r_diff == 0 or c_diff == 0, "Diagonal moves never allowed"
+        if r_diff != 0 and c_diff != 0:
+            logging.warning("Diagonal moves never allowed")
+            res = False
 
         man_dist = r_diff + c_diff  # Manhattan distance
-        msg = "Only scout can move multiple squares"
-        assert man_dist == 1 or self._piece.rank == Rank.scout(), msg
+        if man_dist != 1 and self._piece.rank != Rank.scout():
+            logging.warning("Only scout can move multiple squares")
+            res = False
+        return True
 
     @staticmethod
     def _is_valid_piece(piece: Piece):
