@@ -82,6 +82,11 @@ class Player:
         return self._color
 
     @property
+    def num_pieces(self) -> int:
+        r""" Accessor for number of pieces the player has """
+        return len(self._pieces)
+
+    @property
     def move_set(self) -> MoveSet:
         r""" Accessor for the \p Player's \p MoveSet"""
         return self._move_set

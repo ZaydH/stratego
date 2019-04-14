@@ -75,6 +75,7 @@ class State:
                 raise ValueError("Unparseable file file \"%s\"" % line)
 
         # Define the initial set of moves each player can make
+        Move.set_board(brd)
         MoveSet.set_board(brd)
         for plyr, other in [(state._red, state._blue), (state._blue, state._red)]:
             plyr.build_move_set(other)

@@ -4,13 +4,13 @@ from stratego.location import Location
 from stratego.move import Move
 from stratego.piece import Color, Piece, Rank
 
-from testing_utils import build_test_board
+from testing_utils import build_test_board, substr_in_err
 
 # Create a dummy board for use in comparison in the movements
 num_brd_rows = num_brd_cols = 10
 blocked_loc = Location(3, 2)
 
-Move._brd = build_test_board(num_brd_rows, num_brd_cols, {blocked_loc})
+Move.set_board(build_test_board(num_brd_rows, num_brd_cols, {blocked_loc}))
 
 
 def test_verify_neighbor_movements():
@@ -103,7 +103,7 @@ def test_diagonal_movement():
             elif man_dist == 2:
                 with pytest.raises(Exception) as e_info:
                     Move(p, p.loc, l_new)
-                assert "diagonal" in str(e_info.value).lower()
+                assert substr_in_err("diagonal", e_info)
 
 
 def test_scout_movements():
@@ -124,7 +124,7 @@ def test_scout_movements():
                     else:
                         with pytest.raises(Exception) as e_info:
                             Move(p, p.loc, new_loc)
-                        assert "multiple" in str(e_info.value).lower()
+                        assert substr_in_err("multiple", e_info)
 
 
 def test_immovable_pieces():
