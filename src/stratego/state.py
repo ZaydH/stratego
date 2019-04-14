@@ -38,6 +38,10 @@ class State:
         r""" Accessor for the COLOR of the player whose turn is next """
         self._next = Color.RED if self._next == Color.RED else Color.BLUE
 
+    def get_player(self, color: Color) -> Player:
+        r""" Get the color associated with the \p Color """
+        return self.red if color == Color.RED else self.blue
+
     @property
     def next_player(self) -> Player:
         r""" Accessor for player whose turn is next """
@@ -152,32 +156,47 @@ class State:
         # Process the attack
         if move.is_attack():
             self._do_attack(move)
+        if not move.is_attack() or move.is_attack_successful():
         # ToDo Ensure update accounts for blocked scout moves
         assert False
 
         # Switch next player as next
         self.toggle_next_color()
 
+    def get_other_player(self, plyr: Player) -> Player:
+        r"""
+        Gets other player
+
+        :param plyr: Player whose opposite will be returned
+        :return: Red player if \p plyr is blue else the blue player
+        """
+        return self.red if plyr.color == self.blue else self.blue
+
     def _do_attack(self, move: Move) -> None:
         r"""
         Process the attack for all data structures in the \p State.  The move is handled separately
+        :param move: Attack move
         """
-        if move.piece.color == Color.RED: red_p, blue_p = move.piece, move.attacked
-        else: red_p, blue_p = move.attacked, move.piece
-
-        if red_p.rank == blue_p.rank:
-            del_red = del_blue = True
-        elif red_p.rank > move.attacked.rank:
-            del_red, del_blue = False, True
-        else:
-            del_red, del_blue = True, False
-
-        # Handle the deletion of the piece(s)
-        grp = [(self.red, self.blue, red_p, del_red), (self.blue, self.red, blue_p, del_blue)]
-        for plyr, other, piece, del_plyr in grp:
-            if not del_plyr: continue
+        delete_other = move.is_attack_successful() or move.piece.rank == move.attacked.rank
+        # Update the piece information first
+        grp = [move.piece]  # Attacker always deleted since move or lose
+        # Other piece deleted in tie or successful attack
+        if delete_other: grp.append(move.attacked)
+        for piece in grp:
             self._printer.delete_piece(piece.loc)
+            plyr = self.red if piece.color == Color.RED else self.blue
             plyr.delete_piece_info(piece)
+
+        # Update MoveSet at attacking piece location
+        for plyr in [self.red, self.blue]:
+            plyr.delete_moveset_info(move.piece.loc, self.get_other_player(plyr))
+        # If the attacked piece is removed, update the moveset
+        if delete_other:
+            other = self.get_player(move.attacked.color)
+            other.delete_moveset_info(move.attacked.loc, self.get_other_player(plyr))
+
+    def _do_movement(self, move: Move):
+        assert False
 
     def write_board(self) -> str:
         r""" Return the board contents as a string """

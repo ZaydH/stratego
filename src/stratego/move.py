@@ -55,6 +55,10 @@ class Move:
         r""" Returns True if this move corresponds to an attack """
         return self._attacked is not None
 
+    def is_attack_successful(self):
+        assert self.is_attack()
+        return self.piece.rank > self.attacked.rank
+
     @staticmethod
     def _is_valid_loc(loc: Location):
         r""" Checks whether a move location is valid """
