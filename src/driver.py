@@ -31,6 +31,28 @@ def _main():
     game.move((3, 1), (4, 1))
     game.display_current()
 
+    game.move((7, 3), (2, 3))
+    game.display_current()
+
+    game.move((0, 3), (1, 3))
+    game.display_current()
+
+    game.move((2, 3), (2, 5))
+    game.display_current()
+
+    game.move((1, 3), (7, 3))
+    # game.move((0, 0), (1, 0))
+    game.display_current()
+
+    game.move((2, 5), (0, 5))
+    game.display_current()
+
+    game.move((7, 3), (7, 2))
+    game.display_current()
+
+    game.move((7, 2), (7, 3))
+    game.display_current()
+
 
 if __name__ == "__main__":
     _main()

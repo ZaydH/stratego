@@ -30,5 +30,3 @@ def setup_logger(quiet_mode: bool = False, filename: str = "test.log",
     # matplotlib._log.setLevel(logging.INFO)  # pylint: disable=protected-access
 
     logging.info("******************* New Run Beginning *****************")
-
-

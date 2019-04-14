@@ -74,6 +74,7 @@ class MoveSet:
         assert p.is_scout() or p.loc.is_adjacent(other)
 
         key = self._make_move_key(p.loc, other)
+        # assert key not in self._avail
         self._avail[key] = Move(p, p.loc, other)
 
     def _del_move(self, p: Piece, other: Location) -> None:
@@ -93,6 +94,15 @@ class MoveSet:
         key = self._make_move_key(p.loc, new_loc)
         return key in self._avail
 
+    def get_move(self, p: Piece, new_loc: Location) -> Optional[Move]:
+        r"""
+        Gets the move corresponding to the \p Piece and \p Location.  If the corresponding \p Move
+        is not found, \p None is returned.
+        """
+        key = self._make_move_key(p.loc, new_loc)
+        try: return self._avail[key]
+        except KeyError: return None
+
     def __len__(self) -> int:
         r""" Return number of moves in the \p MoveSet """
         return len(self._avail)
@@ -105,7 +115,7 @@ class MoveSet:
         :param plyr_locs: Location of pieces for same color as \p MoveSet
         :param other_locs: Location of pieces of other \p Player
         """
-        self._handle_loc_change(loc, plyr_locs, other_locs, True)
+        self._handle_loc_change(loc, plyr_locs, other_locs, False)
 
     def add_moves_after_delete(self, loc: Location, plyr_locs: dict, other_locs: dict) -> None:
         r"""
@@ -141,17 +151,15 @@ class MoveSet:
             # If found p is not a scout and not adjacent, move on
             if not p.is_scout() and not p.loc.is_adjacent(loc): continue
 
-            if add:
-                self._add_move(p, loc)
-            elif loc in plyr_locs:
-                self._del_move(p, loc)
+            if add: self._add_move(p, loc)
+            elif loc in plyr_locs: self._del_move(p, loc)
 
             if p.is_scout():
                 for srch in opp:
                     if srch in plyr_locs: break
 
-                    if add: self._add_move(p, loc)
-                    else: self._del_move(p, loc)
+                    if add: self._add_move(p, srch)
+                    else: self._del_move(p, srch)
 
                     # Perform second since could still attack
                     if srch in other_locs: break
@@ -236,6 +244,11 @@ class Player:
         r""" Returns \p True if the player has a move for the piece ot the specified \p Location """
         assert piece is not None
         return self.move_set.has_move(piece, new_loc)
+
+    def get_move(self, piece: Piece, new_loc: Location) -> Optional[Move]:
+        r""" Returns \p True if the player has a move for the piece ot the specified \p Location """
+        assert piece is not None
+        return self.move_set.get_move(piece, new_loc)
 
     def piece_locations(self) -> Set[Location]:
         r""" Location of all of the \p Player's pieces """

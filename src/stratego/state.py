@@ -150,7 +150,7 @@ class State:
                         "# Lines beginning with \"#\" are comments\n")
             f_out.write("\n".join([State.SEP.join(line) for line in lines]))
 
-    def update(self, move: Move) -> None:
+    def update(self, move: Move) -> bool:
         r"""
         Updates the state of the game by perform the move.
 
@@ -158,6 +158,8 @@ class State:
         """
         if move.piece.color != self.next_color:
             raise ValueError("Move piece color does not match the expected next player")
+
+        # ToDo Verify no cyclic moves
 
         # Check for illegal cycling
         mv_plyr = self.get_player(move.piece.color)
@@ -182,6 +184,7 @@ class State:
 
         # Switch next player as next
         self.toggle_next_color()
+        return True
 
     def get_other_player(self, plyr: Player) -> Player:
         r"""

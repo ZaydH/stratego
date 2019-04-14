@@ -8,6 +8,7 @@ r"""
     :copyright: (c) 2019 by Steven Walton and Zayd Hammoudeh.
     :license: MIT, see LICENSE for more details.
 """
+import logging
 from pathlib import Path
 from typing import Union, Tuple
 
@@ -46,6 +47,8 @@ class Game:
         orig, new = Location(cur_loc[0], cur_loc[1]), Location(new_loc[0], new_loc[1])
         p = self._state.next_player.get_piece_at_loc(orig)
         if p is None:
+            fields = (self._state.next_color.name, orig.r, orig.c)
+            logging.warning("No %s piece at location (%d,%d)", *fields)
             return False
 
         other = self._state.get_other_player(self._state.next_player)
@@ -54,8 +57,7 @@ class Game:
         if not m.verify() or m.piece.color != self._state.next_color:
             return False
 
-        self._state.update(m)
-        return True
+        return self._state.update(m)
 
     def display_current(self):
         r""" Displays the current state of the game to the console """

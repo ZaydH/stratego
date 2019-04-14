@@ -38,7 +38,8 @@ class Move:
         self._piece, self._attacked = p, attacked
         self._orig, self._new = orig, new
 
-        self.verify()
+        if not self.verify():
+            raise ValueError("Unable to verify move")
 
     @property
     def piece(self) -> Piece:
@@ -79,20 +80,16 @@ class Move:
 
     def verify(self) -> bool:
         r""" Simple verifier that the movement is valid """
-        res = True
         if self._orig == self._new:
-            logging.warning("Piece cannot move to the same location")
-            res = False
+            raise ValueError("Piece cannot move to the same location")
 
         r_diff, c_diff = self._orig.diff(self._new)
         if r_diff != 0 and c_diff != 0:
-            logging.warning("Diagonal moves never allowed")
-            res = False
+            raise ValueError("Diagonal moves never allowed")
 
         man_dist = r_diff + c_diff  # Manhattan distance
         if man_dist != 1 and self._piece.rank != Rank.scout():
-            logging.warning("Only scout can move multiple squares")
-            res = False
+            raise ValueError("Only scout can move multiple squares")
         return True
 
     @staticmethod
