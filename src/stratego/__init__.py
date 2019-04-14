@@ -32,9 +32,7 @@ class Game:
         self._brd = Board.importer(board_path)
         Move.set_board(self._brd)
 
-        self._state = State.importer(state_path, self._brd)
-        self._printer = Printer(self._brd, self._state.red.pieces(),
-                                self._state.blue.pieces(), visibility)
+        self._state = State.importer(state_path, self._brd, visibility)
 
     def move(self, m: Move) -> None:
         r"""
@@ -42,10 +40,10 @@ class Game:
         :param m: Move to perform
         """
         assert m.verify()
-        assert m.piece.color == self._state.next_player(), "Not player's turn to move"
+        assert m.piece.color == self._state.next_color, "Not player's turn to move"
         # ToDo Ensure update accounts for blocked scout moves
         pass
 
     def display_current(self):
         r""" Displays the current state of the game to the console """
-        print(self._printer.write())
+        print(self._state.write_board())

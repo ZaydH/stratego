@@ -45,6 +45,16 @@ class Move:
         r""" Accessor for the piece to be moved """
         return self._piece
 
+    @property
+    def attacked(self) -> Piece:
+        r""" Returns the piece being attacked (i.e., the one not being moved) """
+        assert self._attacked is not None
+        return self._attacked
+
+    def is_attack(self) -> bool:
+        r""" Returns True if this move corresponds to an attack """
+        return self._attacked is not None
+
     @staticmethod
     def _is_valid_loc(loc: Location):
         r""" Checks whether a move location is valid """

@@ -3,6 +3,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Union
 
+from stratego import Printer
 from .board import Board
 from .location import Location
 from .move import Move
@@ -26,9 +27,21 @@ class State:
         self._red = Player(Color.RED)
         self._blue = Player(Color.BLUE)
 
-    def next_player(self):
-        r""" Accessor for player whose turn is next """
+        self._printer = None
+
+    @property
+    def next_color(self) -> Color:
+        r""" Accessor for the COLOR of the player whose turn is next """
         return self._next
+
+    def toggle_next_color(self) -> None:
+        r""" Accessor for the COLOR of the player whose turn is next """
+        self._next = Color.RED if self._next == Color.RED else Color.BLUE
+
+    @property
+    def next_player(self) -> Player:
+        r""" Accessor for player whose turn is next """
+        return self.red if self._next == Color.RED else self.blue
 
     @property
     def red(self) -> Player: return self._red
@@ -38,12 +51,14 @@ class State:
 
     @staticmethod
     # pylint: disable=protected-access
-    def importer(file_path: Union[Path, str], brd: Board) -> 'State':
+    def importer(file_path: Union[Path, str], brd: Board,
+                 vis: Printer.Visibility = Printer.Visibility.NONE) -> 'State':
         r"""
         Factory method to construct \p State objects from a file.
 
         :param file_path: File defining the current state
         :param brd: Board corresponding to the state to the current state
+        :param vis: Specifies whose pieces are visible
         :return: Constructed \p State object
         """
         if isinstance(file_path, str): file_path = Path(file_path)
@@ -79,6 +94,9 @@ class State:
         MoveSet.set_board(brd)
         for plyr, other in [(state._red, state._blue), (state._blue, state._red)]:
             plyr.build_move_set(other)
+
+        # Create the state printer
+        state._printer = Printer(state._brd, state.red.pieces(), state.blue.pieces(), vis)
 
         assert state._is_valid(), "Input state is invalid"
         return state
@@ -128,9 +146,41 @@ class State:
                         "# Lines beginning with \"#\" are comments\n")
             f_out.write("\n".join([State.SEP.join(line) for line in lines]))
 
-    def update(self, move: Move):
+    def update(self, move: Move) -> None:
+        if move.piece.color != self.next_color:
+            raise ValueError("Move piece color does not match the expected next player")
+        # Process the attack
+        if move.is_attack():
+            self._do_attack(move)
         # ToDo Ensure update accounts for blocked scout moves
-        pass
+        assert False
 
         # Switch next player as next
-        self._next = self._next.get_next()
+        self.toggle_next_color()
+
+    def _do_attack(self, move: Move) -> None:
+        r"""
+        Process the attack for all data structures in the \p State.  The move is handled separately
+        """
+        if move.piece.color == Color.RED: red_p, blue_p = move.piece, move.attacked
+        else: red_p, blue_p = move.attacked, move.piece
+
+        if red_p.rank == blue_p.rank:
+            del_red = del_blue = True
+        elif red_p.rank > move.attacked.rank:
+            del_red, del_blue = False, True
+        else:
+            del_red, del_blue = True, False
+
+        # Handle the deletion of the piece(s)
+        grp = [(self.red, self.blue, red_p, del_red), (self.blue, self.red, blue_p, del_blue)]
+        for plyr, other, piece, del_plyr in grp:
+            if not del_plyr: continue
+            self._printer.delete_piece(piece.loc)
+            plyr.delete_piece_info(piece)
+
+    def write_board(self) -> str:
+        r""" Return the board contents as a string """
+        return self._printer.write()
+
+

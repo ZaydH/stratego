@@ -55,6 +55,9 @@ class MoveSet:
         key = self._make_move_key(p.loc, other)
         self._avail[key] = Move(p, p.loc, other)
 
+    def remove(self, loc: Location) -> None:
+        assert False
+
     def __len__(self) -> int:
         r""" Return number of moves in the \p MoveSet """
         return len(self._avail)
@@ -72,7 +75,8 @@ class Player:
         """
         self._color = color
 
-        self._move_set = None
+        # noinspection PyTypeChecker
+        self._move_set = None  # type: MoveSet
         self._locs = dict()
         self._pieces = set()
 
@@ -99,9 +103,14 @@ class Player:
         self._pieces.add(piece)
         self._locs[piece.loc] = piece
 
-    def delete_piece(self, piece: Piece) -> None:
+    def delete_piece_info(self, piece: Piece) -> None:
         r""" Remove \p piece from the \p Player's set of pieces """
         self._pieces.remove(piece)
+        del self._locs[piece.loc]
+
+    def delete_moveset_info(self, loc: Location, other: 'Player') -> None:
+        # ToDo update the MoveSet after deleting a piece
+        assert False
 
     def has_flag(self) -> bool:
         r""" Returns True if the player has a flag """
