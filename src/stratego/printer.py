@@ -47,12 +47,9 @@ class Printer:
         self._row_sep = "-".join(["+"] * (self._n_cols + 1))
 
         # Fill in the locations that cannot be entered
-        self._impassable = {}  # Set dummy value to prevent assertion error
         impass_str = self._impassable_piece()
         for l in self._brd.blocked:
-            self._set_piece(l, impass_str)
-        # Must set after setting cell values to prevent assertion err
-        self._impassable = self._brd.blocked
+            self._set_piece(l, impass_str, ignore_impassable=True)
 
         # Add the existing pieces
         for pieces in [red_pieces, blue_pieces]:
@@ -76,9 +73,13 @@ class Printer:
         self._verify_piece_loc(loc)
         return self._cells[loc.r + 1][loc.c + 1]
 
-    def _set_piece(self, loc: Location, value: str, exist_ok: bool = True):
+    def _set_piece(self, loc: Location, value: str, exist_ok: bool = True,
+                   ignore_impassable: bool = False) -> None:
         r""" Set the string for the piece at the specified \p Location with \p value """
-        self._verify_piece_loc(loc)
+        if not ignore_impassable:
+            self._verify_piece_loc(loc)
+        else:
+            assert loc.is_inside_board(self._brd.num_rows, self._brd.num_cols)
         if not exist_ok:
             assert self._is_loc_empty(loc), "Setting a location that should be empty"
         self._cells[loc.r + 1][loc.c + 1] = value

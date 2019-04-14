@@ -8,7 +8,12 @@ from .board import Board
 
 
 class MoveSet:
-    brd = None  # type: Board
+    _brd = None  # type: Board
+
+    @staticmethod
+    def set_board(brd: Board) -> None:
+        r""" Sets the board for the entire class """
+        MoveSet._brd = brd
 
     r""" Moves available to a player """
     def __init__(self):
@@ -24,7 +29,7 @@ class MoveSet:
         :param other_locs: Location of pieces of other player
         :return: Constructed move set
         """
-        assert MoveSet.brd is not None, "Board information be present"
+        assert MoveSet._brd is not None, "Board information be present"
         ms = MoveSet()
         for p in pieces:
             # Bombs and flags can be ignored
@@ -33,22 +38,26 @@ class MoveSet:
             if p.rank != Rank.scout():
                 for loc in p.loc.neighbors():
                     # Ignore pieces not allowed by board or where piece of same color
-                    if not ms.brd.is_inside(loc) or loc in locs: continue
+                    if not ms._brd.is_inside(loc) or loc in locs: continue
                     ms.add(p, loc)
             # Check scout pieces specially
             else:
-                for direction_list in ms.brd.to_edge_lists(p.loc):
+                for direction_list in ms._brd.to_edge_lists(p.loc):
                     for loc in direction_list:
                         # If scout blocked by board location or same color, immediately stop
-                        if not ms.brd.is_inside(loc) or loc in locs: break
+                        if not ms._brd.is_inside(loc) or loc in locs: break
                         ms.add(p, loc)
                         if loc in other_locs: break
         return ms
 
     def add(self, p: Piece, other: Location) -> None:
         r""" Add \p piece's move to \p other to the \p MoveSet """
-        key = [self._make_move_key(p.loc, other)]
+        key = self._make_move_key(p.loc, other)
         self._avail[key] = Move(p, p.loc, other)
+
+    def __len__(self) -> int:
+        r""" Return number of moves in the \p MoveSet """
+        return len(self._avail)
 
     @staticmethod
     def _make_move_key(orig: Location, new: Location):
@@ -71,6 +80,11 @@ class Player:
     def color(self) -> Color:
         r""" Accessor for the \p Player's \p Color. """
         return self._color
+
+    @property
+    def move_set(self) -> MoveSet:
+        r""" Accessor for the \p Player's \p MoveSet"""
+        return self._move_set
 
     def add_piece(self, piece: Piece) -> None:
         r""" Add \p piece to \p Player's set of pieces """

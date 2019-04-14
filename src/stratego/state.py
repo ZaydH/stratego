@@ -7,7 +7,7 @@ from .board import Board
 from .location import Location
 from .move import Move
 from .piece import Color, Piece, Rank
-from .player import Player
+from .player import Player, MoveSet
 
 
 class State:
@@ -75,6 +75,7 @@ class State:
                 raise ValueError("Unparseable file file \"%s\"" % line)
 
         # Define the initial set of moves each player can make
+        MoveSet.set_board(brd)
         for plyr, other in [(state._red, state._blue), (state._blue, state._red)]:
             plyr.build_move_set(other)
 
@@ -86,7 +87,7 @@ class State:
         res = True
 
         # Check no duplicate locations. Intersection of the sets means a duplicate
-        if self._red.piece_locations() & self._blue.piece_locations():
+        if self._red.piece_locations() & self._blue.piece_locations() != set():
             logging.error("Duplicate piece locations")
             res = False
 

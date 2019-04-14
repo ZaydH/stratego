@@ -21,7 +21,12 @@ class Color(Enum):
     BLUE = 1
 
     def get_next(self):
-        r""" Get the next turn's player color. """
+        r""" Get the next turn's player color.
+        >>> print(Color.RED.get_next())
+        Color.BLUE
+        >>> print(Color.BLUE.get_next())
+        Color.RED
+        """
         return Color.RED if self == Color.BLUE else Color.BLUE
 
 

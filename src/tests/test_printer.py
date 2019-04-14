@@ -26,14 +26,14 @@ def test_printer_piece_movement():
 def test_printer_visibility():
     r""" Verify the visibility settings of the \p Printer class """
     brd = build_test_board(4, 4)
-    p = Printer(brd, {}, {}, Printer.Visibility.NONE)
+    p = Printer(brd, set(), set(), Printer.Visibility.NONE)
     assert not p._is_visible(Color.RED)
     assert not p._is_visible(Color.BLUE)
 
-    p = Printer(brd, {}, {}, Printer.Visibility.RED)
+    p = Printer(brd, set(), set(), Printer.Visibility.RED)
     assert p._is_visible(Color.RED)
     assert not p._is_visible(Color.BLUE)
 
-    p = Printer(brd, {}, {}, Printer.Visibility.ALL)
+    p = Printer(brd, set(), set(), Printer.Visibility.ALL)
     assert p._is_visible(Color.RED)
     assert p._is_visible(Color.BLUE)
