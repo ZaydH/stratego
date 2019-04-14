@@ -9,7 +9,7 @@ r"""
     :license: MIT, see LICENSE for more details.
 """
 import logging
-from typing import Union, Set
+from typing import Set, Union
 from pathlib import Path
 from enum import Enum
 
@@ -32,10 +32,10 @@ class Board:
             r"""
             >>> ps = Board.PieceSet(); print(ps.tot_count)
             0
-            >>> ps.set_rank_count(Rank(Rank.SPY), 4); ps.set_rank_count(Rank(4), 5)
+            >>> ps.set_rank_count(Rank.spy(), 4); ps.set_rank_count(Rank(4), 5)
             >>> print(ps.tot_count)
             9
-            >>> ps.set_rank_count(Rank(Rank.SPY), 1)
+            >>> ps.set_rank_count(Rank.spy(), 1)
             >>> print(ps.tot_count)
             6
             """

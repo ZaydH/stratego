@@ -111,18 +111,7 @@ class Printer:
 
     # noinspection PyProtectedMember
     def _is_visible(self, color: Color) -> bool:
-        r"""
-        Returns True if the piece color is visible
-        >>> p = Printer(4,4,{},{},{},Printer.Visibility.NONE)
-        >>> print(p._is_visible(Color.RED), p._is_visible(Color.BLUE))
-        False False
-        >>> p = Printer(4,4,{},{},{},Printer.Visibility.RED)
-        >>> print(p._is_visible(Color.RED), p._is_visible(Color.BLUE))
-        True False
-        >>> p = Printer(4,4,{},{},{},Printer.Visibility.ALL)
-        >>> print(p._is_visible(Color.RED), p._is_visible(Color.BLUE))
-        True True
-        """
+        r""" Returns True if the piece color is visible """
         return color in self._visible
 
     def _format_piece(self, piece: Piece) -> str:

@@ -33,15 +33,17 @@ class Rank:
     SPY = 'S'
     BOMB = 'B'
     FLAG = 'F'
-
     MARSHALL = 1
     MINER = 8
+    SCOUT = 9
 
+    _static_pieces = dict()
+    _STR_PIECES = {SPY, BOMB, FLAG}
     _all = []
 
     def __init__(self, rank: Union[str, int]):
         if isinstance(rank, str):
-            if rank not in {Rank.SPY, Rank.BOMB, Rank.FLAG}:
+            if rank not in Rank._STR_PIECES:
                 rank = int(rank)
         assert not isinstance(rank, int) or Rank.MIN() <= rank <= Rank.MAX()
         self._val = rank
@@ -67,10 +69,43 @@ class Rank:
     @staticmethod
     def MAX() -> int: return 9  # pylint: disable=missing-docstring,invalid-name
 
+    @staticmethod
+    def marshall() -> 'Rank':
+        r""" Accessor for the "Flag" rank """
+        return Rank._static_piece(Rank.MARSHALL)
+
+    @staticmethod
+    def scout() -> 'Rank':
+        r""" Accessor for the "Scout" rank """
+        return Rank._static_piece(Rank.SCOUT)
+
+    @staticmethod
+    def spy() -> 'Rank':
+        r""" Accessor for the "Spy" rank """
+        return Rank._static_piece(Rank.SPY)
+
+    @staticmethod
+    def flag() -> 'Rank':
+        r""" Accessor for the "Flag" rank """
+        return Rank._static_piece(Rank.FLAG)
+
+    @staticmethod
+    def bomb() -> 'Rank':
+        r""" Accessor for the "Bomb" rank """
+        return Rank._static_piece(Rank.BOMB)
+
+    @staticmethod
+    def _static_piece(r: Union[str, int]):
+        r""" Extracts a static piece, adding it to the static piece dictionary if necessary """
+        try: return Rank._static_pieces[r]
+        except KeyError:
+            Rank._static_pieces[r] = Rank(r)
+            return Rank._static_pieces[r]
+
     def is_immobile(self) -> bool:
         r"""
         Checks if the rank allows the piece to move.
-        >>> f = Rank(Rank.FLAG); b = Rank(Rank.BOMB); s= Rank(Rank.SPY)
+        >>> f = Rank.flag(); b = Rank.bomb(); s = Rank.spy()
         >>> print(f.is_immobile(), b.is_immobile(), s.is_immobile())
         True True False
         """
@@ -80,7 +115,7 @@ class Rank:
         r"""
         Returns True if the two ranks are equal
 
-        >>> p1 = Rank(Rank.MARSHALL); b = Rank(Rank.BOMB); s = Rank(Rank.SPY)
+        >>> p1 = Rank.marshall(); b = Rank.bomb(); s = Rank.spy()
         >>> print(p1 == p1, p1 == b, s == p1)
         True False False
         """
@@ -96,7 +131,7 @@ class Rank:
         :return: True if the attacking (left) rank beats the defending (right) rank
 
         >>> p1, p8 = Rank(1), Rank(8)
-        >>> s = Rank(Rank.SPY); b = Rank(Rank.BOMB); f = Rank(Rank.FLAG)
+        >>> s = Rank.spy(); b = Rank.bomb(); f = Rank.flag()
         >>> print(p1 > s, s > p1, s > p8, p8 > s, s > f, p8 > f)
         True True False True True True
         >>> print(p8 > b, p1 > b)

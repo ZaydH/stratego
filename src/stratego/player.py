@@ -36,7 +36,7 @@ class Player:
 
     def has_flag(self) -> bool:
         r""" Returns True if the player has a flag """
-        flag = Rank(Rank.FLAG)
+        flag = Rank.flag()
         return any(p.rank == flag for p in self._pieces)
 
     def piece_locations(self) -> Set[Location]:
