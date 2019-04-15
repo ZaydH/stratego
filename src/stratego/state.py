@@ -6,7 +6,7 @@ from typing import Union
 from stratego import Printer
 from .board import Board
 from .location import Location
-from .move import Move
+from .move import Move, MoveStack
 from .piece import Color, Piece, Rank
 from .player import Player, MoveSet
 
@@ -29,6 +29,7 @@ class State:
 
         # noinspection PyTypeChecker
         self._printer = None  # type: Printer
+        self._stack = MoveStack()
 
     @property
     def next_color(self) -> Color:
@@ -49,10 +50,14 @@ class State:
         return self.red if self._next == Color.RED else self.blue
 
     @property
-    def red(self) -> Player: return self._red
+    def red(self) -> Player:
+        r""" Accessor for the RED player """
+        return self._red
 
     @property
-    def blue(self) -> Player: return self._blue
+    def blue(self) -> Player:
+        r""" Accessor for the BLUE player """
+        return self._blue
 
     @staticmethod
     # pylint: disable=protected-access
@@ -184,6 +189,8 @@ class State:
 
         # Switch next player as next
         self.toggle_next_color()
+        # Only push onto the move stack once move has definitely been successfully completed
+        self._stack.push(move)
         return True
 
     def get_other_player(self, plyr: Player) -> Player:

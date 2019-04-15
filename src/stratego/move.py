@@ -109,13 +109,25 @@ class MoveStack:
     def __init__(self):
         self._buf = []
 
+    def head(self) -> Move:
+        r""" Returns the element on top of the stack.  Does not affect the stack contents. """
+        assert not self.is_empty(), "Move stack empty"
+        return self._buf[-1]
+
     def pop(self) -> Move:
-        assert self._buf, "Move stack empty"
+        r""" Remove the \p Move off the top of the stack and return it """
+        assert not self.is_empty(), "Move stack empty"
         return self._buf.pop()
 
-    def append(self, value: Move) -> None:
-        return self._buf.append(value)
+    def push(self, move: Move) -> None:
+        r""" Place \p move on the top of the stack """
+        return self._buf.append(move)
 
     def is_cyclic(self, move: Move) -> bool:
         # ToDo implement is_cyclic check
+        logging.warning("ToDO: is_cyclic check not implemented")
         return False
+
+    def is_empty(self) -> bool:
+        r""" Return True if \p MoveStack is empty """
+        return bool(self._buf)
