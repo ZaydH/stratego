@@ -131,3 +131,6 @@ class Location:
     def file_example_str() -> str:
         r""" Example displaying how the board file blocked location should appear. """
         return "(ROW,COLUMN)"
+
+    def __str__(self):
+        return "(%d,%d)" % (self.r, self.c)

@@ -9,10 +9,13 @@ r"""
     :license: MIT, see LICENSE for more details.
 """
 import logging
+import sys
+import time
 from pathlib import Path
 from typing import Union, Tuple
 
 # import matplotlib
+from stratego.agent import Agent
 from stratego.location import Location
 from .move import Move
 from .board import Board
@@ -54,10 +57,64 @@ class Game:
         other = self._state.get_other_player(self._state.next_player)
         attacked = other.get_piece_at_loc(new)
         m = Move(p, orig, new, attacked)
-        if not m.verify() or m.piece.color != self._state.next_color:
+        return self.play_move(m)
+
+    def play_move(self, m: Move, display: bool = False) -> bool:
+        r"""
+        Performs the specified \p Move
+        :param m: Move to be performed
+        :param display: If True, display information about the move and the board
+        :return: True if the move was successful
+        """
+        try: m.verify()
+        except KeyError as e_info:
+            logging.error(str(e_info))
             return False
 
-        return self._state.update(m)
+        if m.piece.color != self._state.next_color:
+            logging.error("Moved piece's color did not match the expected color")
+            return False
+
+        if display:
+            print("Player: %s moved from %s to %s\n" % (m.piece.color, m.orig, m.new))
+            sys.stdout.flush()
+
+        if not self._state.update(m): return False
+
+        if display:
+            print("\n".join([self._state.write_board(), "\n"]))
+            sys.stdout.flush()
+        return True
+
+    def two_agent_automated(self, a1: Agent, a2: Agent, wait_time: float = 0,
+                            display: bool = False) -> None:
+        r"""
+        Simple interface to play
+
+        :param a1: First agent (can be of either color)
+        :param a2: Second automated game playing agent (must be opposite color of \p a1)
+        :param wait_time: Time (in seconds) to wait between moves.  Must be non-negative
+        :param display: If True, display information about the move and the board
+        :return:
+        """
+        if wait_time < 0:
+            raise ValueError("wait_time must be non-negative")
+        assert a1.color != a2.color, "Both agents cannot be the same color"
+
+        if display:
+            self.display_current()
+            print("")
+            if wait_time > 0: time.sleep(wait_time)
+
+        cur, other = (a1, a2) if a1.color == self._state.next_player.color else (a2, a1)
+        while not self._state.is_game_over():
+            m = cur.get_next_move()
+            self.play_move(m, display)
+            if wait_time > 0: time.sleep(wait_time)
+            cur, other = other, cur
+
+        if display:
+            print("Game over.  Player %d won" % other.color.name)
 
     def display_current(self):
         r""" Displays the current state of the game to the console """

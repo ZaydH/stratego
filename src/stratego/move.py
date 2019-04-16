@@ -30,13 +30,13 @@ class Move:
         if not Move._is_valid_piece(p):
             raise ValueError("Invalid piece to be moved")
 
-        # ZSH - This check should be correct but may need to be revisited
-        assert attacked is None or attacked.loc == new, "Location of attacked mismatch"
-        if attacked is not None and p.color == attacked.color:
-            raise ValueError("Attacking and attacked pieces cannot be of the same color")
-
         self._piece, self._attacked = p, attacked
         self._orig, self._new = orig, new
+
+        # ZSH - This check should be correct but may need to be revisited
+        assert (not self.is_attack()) or attacked.loc == new, "Location of attacked mismatch"
+        if self.is_attack() and p.color == attacked.color:
+            raise ValueError("Attacking and attacked pieces cannot be of the same color")
 
         if not self.verify():
             raise ValueError("Unable to verify move")
@@ -74,9 +74,14 @@ class Move:
         """
         return not self.is_attack() or self.is_attack_successful()
 
-    def is_attack_successful(self):
+    def is_attack_successful(self) -> bool:
+        r""" Return True if the moving piece moves into the position of the attacked piece """
         assert self.is_attack()
         return self.piece.rank > self.attacked.rank
+
+    def is_game_over(self) -> bool:
+        r""" Return True if the move attacked the flag """
+        return self.is_attack() and self.attacked.rank == Rank.flag()
 
     @staticmethod
     def _is_valid_loc(loc: Location):

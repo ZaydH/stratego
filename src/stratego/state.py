@@ -288,6 +288,14 @@ class State:
 
         self._printer.add_piece(move.piece)
 
+    def is_game_over(self) -> bool:
+        r""" Returns True if the game has ended """
+        # Last move attacked flag
+        if not self._stack.is_empty() and self._stack.top().is_game_over(): return True
+        # Current player has no moves
+        if len(self.next_player.move_set) == 0: return True
+        return False
+
     def write_board(self) -> str:
         r""" Return the board contents as a string """
         return self._printer.write()

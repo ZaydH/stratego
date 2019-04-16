@@ -23,6 +23,11 @@ class MoveSet:
         self._avail = dict()  # Available moves
         self._color = color
 
+    @property
+    def avail(self) -> dict:
+        r""" Accessor for the available moves """
+        return self._avail
+
     @staticmethod
     def build(pieces: Set[Piece], locs: dict, other_locs: dict) -> 'MoveSet':
         r"""
