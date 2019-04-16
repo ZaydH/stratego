@@ -182,7 +182,9 @@ class MoveSet:
                 elif srch in other_locs: p = other_locs[srch]
                 if p is not None: break
             # If no piece in search direction
-            if p is None or p.color != self._color or p.is_immobile(): continue
+            if p is None or p.is_immobile(): continue
+            # Ignore pieces of other color since will be handled in separate function call
+            if p.color != self._color: continue
             # If found p is not a scout and not adjacent, move on
             if not p.is_scout() and not p.loc.is_adjacent(loc): continue
 

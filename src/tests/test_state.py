@@ -79,7 +79,7 @@ def test_state_moves():
     state = State.importer(path, STD_BRD)
 
     # Verify initial state matches expectations
-    _verify_num_pieces_and_move_set_size(7, 7, 4 + 3, 4 + 3)
+    _verify_num_pieces_and_move_set_size(state, 7, 7, 4 + 3, 4 + 3)
 
     move_stack = MoveStack()
     # Define a series of moves.  Entries in each tuple are:
@@ -117,7 +117,7 @@ def test_state_moves():
         assert state.update(move_stack.top())
         assert state._printer._is_loc_empty(orig)
 
-        _verify_num_pieces_and_move_set_size(num_red_p, num_blue_p, num_red_mv, num_blue_mv)
+        _verify_num_pieces_and_move_set_size(state, num_red_p, num_blue_p, num_red_mv, num_blue_mv)
         printer_out.append(state.write_board())
 
     # Try to move red bomb then the red flag
@@ -136,12 +136,12 @@ def test_state_moves():
         state.undo()
 
         assert state.write_board() == printer_out[-i], "Printer mismatch after do/undo"
-        _verify_num_pieces_and_move_set_size(num_red_p, num_blue_p, num_red_mv, num_blue_mv)
+        _verify_num_pieces_and_move_set_size(state, num_red_p, num_blue_p, num_red_mv, num_blue_mv)
 
 
 def test_small_direct_attack():
     r""" Test making a direct attack """
-    move_list = [(Color.BLUE, Color.RED, (7, 3), (1, 3), 7, 7, 12, 12),
+    move_list = [(Color.BLUE, Color.RED, (7, 3), (1, 3), 7, 7, 11, 11),
                  (Color.RED, Color.BLUE, (0, 3), (7, 3), 6, 6, 5, 5)
                  ]
     _helper_small_test(move_list)
@@ -149,8 +149,8 @@ def test_small_direct_attack():
 
 def test_small_move_then_attack():
     r""" Test making a single move with a scout then a direct attack """
-    move_list = [(Color.BLUE, Color.RED, (7, 3), (1, 3), 7, 7, 12, 12),
-                 (Color.RED, Color.BLUE, (0, 3), (1, 3), 7, 7, 19, 11),
+    move_list = [(Color.BLUE, Color.RED, (7, 3), (1, 3), 7, 7, 11, 11),
+                 (Color.RED, Color.BLUE, (0, 3), (1, 3), 7, 7, 19, 10),
                  (Color.BLUE, Color.RED, (7, 3), (1, 3), 6, 6, 5, 5)
                  ]
     _helper_small_test(move_list)
@@ -167,6 +167,9 @@ def _helper_small_test(move_info):
     path = STATES_PATH / "moveset_small_direct_attack.txt"
     assert path.exists(), "Small direct attack state file not found"
     state = State.importer(path, SMALL_BRD)
+
+    _, _, _, _, num_red_p, num_blue_p, num_red_mv, num_blue_mv = move_info[0]
+    _verify_num_pieces_and_move_set_size(state, num_red_p, num_blue_p, num_red_mv, num_blue_mv)
 
     # Test doing moves
     moves, brd = [], [state.write_board()]
