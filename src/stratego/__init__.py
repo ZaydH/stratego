@@ -116,7 +116,7 @@ class Game:
             num_moves += 1
 
         if display:
-            print("Game over.  Player %d won" % other.color.name)
+            print("Game over.  Player %s won" % other.color.name)
             print("Number of Moves: %d", num_moves)
 
     def display_current(self):
