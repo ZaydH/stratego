@@ -159,6 +159,9 @@ class Rank:
             return self.value == self.MINER
         return self.value < other.value
 
+    def __ge__(self, other):
+        return self.value == other.value or self > other
+
     def __str__(self) -> str:
         return str(self.value)
 

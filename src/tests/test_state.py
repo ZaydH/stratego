@@ -2,6 +2,7 @@ import pytest
 
 from stratego import Move
 from stratego.location import Location
+from stratego.move import MoveStack
 from stratego.state import State
 
 from testing_utils import STATES_PATH, STD_BRD, substr_in_err
@@ -38,13 +39,19 @@ def test_state_moves():
     path = STATES_PATH / "state_move_verify.txt"
     assert path.exists(), "Move verify file does not exist"
 
-    # Verify initial state matches expectations
     state = State.importer(path, STD_BRD)
-    assert state.red.num_pieces == 7
-    assert len(state.red.move_set) == 4 + 3  # Blocked scout
-    assert state.blue.num_pieces == 7
-    assert len(state.blue.move_set) == 4 + 3  # Blocked scout
 
+    # Standardize assert tests
+    def _test_num_pieces_and_move_set_size(_num_red_p, _num_blue_p, _num_red_mv, _num_blue_mv):
+        assert state.red.num_pieces == _num_red_p
+        assert state.blue.num_pieces == _num_blue_p
+        assert len(state.red.move_set) == _num_red_mv
+        assert len(state.blue.move_set) == _num_blue_mv
+
+    # Verify initial state matches expectations
+    _test_num_pieces_and_move_set_size(7, 7, 4 + 3, 4 + 3)
+
+    move_stack = MoveStack()
     # Define a series of moves.  Entries in each tuple are:
     #   0: Original piece location
     #   1: Piece new location
@@ -69,20 +76,19 @@ def test_state_moves():
                  ((3, 5), (9, 5), 6, 5, 16, 22),  # Red scout attack blue spy
                  ((6, 4), (0, 4), 6, 4, 16, 5)  # Blue scout attack red bomb
                  ]
+    printer_out = []
     for orig, new, num_red_p, num_blue_p, num_red_mv, num_blue_mv in move_list:
         orig, new = Location(orig[0], orig[1]), Location(new[0], new[1])
         p = state.next_player.get_piece_at_loc(orig)
         assert p is not None
         attacked = state.get_other_player(state.next_player).get_piece_at_loc(new)
 
-        m = Move(p, orig, new, attacked)
-        assert state.update(m)
+        move_stack.push(Move(p, orig, new, attacked))
+        assert state.update(move_stack.top())
         assert state._printer._is_loc_empty(orig)
 
-        assert state.red.num_pieces == num_red_p
-        assert len(state.red.move_set) == num_red_mv
-        assert state.blue.num_pieces == num_blue_p
-        assert len(state.blue.move_set) == num_blue_mv
+        _test_num_pieces_and_move_set_size(num_red_p, num_blue_p, num_red_mv, num_blue_mv)
+        printer_out.append(state.write_board())
 
     # Try to move red bomb then the red flag
     for orig in [Location(0, 4), Location(0, 6)]:
@@ -93,3 +99,12 @@ def test_state_moves():
 
             with pytest.raises(Exception):
                 Move(p, orig, new, attacked)
+
+    # Verify Undo
+    for i in range(2, len(move_list) + 1):
+        _, _, num_red_p, num_blue_p, num_red_mv, num_blue_mv = move_list[-i]
+        state.undo()
+
+        assert state.write_board() == printer_out[-i], "Printer mismatch after do/undo"
+        _test_num_pieces_and_move_set_size(num_red_p, num_blue_p, num_red_mv, num_blue_mv)
+

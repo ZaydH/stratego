@@ -66,6 +66,14 @@ class Move:
         r""" Returns True if this move corresponds to an attack """
         return self._attacked is not None
 
+    def is_move_successful(self) -> bool:
+        r"""
+        Return True if \p piece successfully moved into location \p new.  This occurs for any move
+        that is not an attack or in the case of an attack when \p has a higher rank than
+        \p attacked
+        """
+        return not self.is_attack() or self.is_attack_successful()
+
     def is_attack_successful(self):
         assert self.is_attack()
         return self.piece.rank > self.attacked.rank
@@ -109,7 +117,7 @@ class MoveStack:
     def __init__(self):
         self._buf = []
 
-    def head(self) -> Move:
+    def top(self) -> Move:
         r""" Returns the element on top of the stack.  Does not affect the stack contents. """
         assert not self.is_empty(), "Move stack empty"
         return self._buf[-1]
@@ -130,4 +138,8 @@ class MoveStack:
 
     def is_empty(self) -> bool:
         r""" Return True if \p MoveStack is empty """
-        return bool(self._buf)
+        return not bool(self._buf)
+
+    def __len__(self) -> int:
+        r""" Number of elements in the stack """
+        return len(self._buf)

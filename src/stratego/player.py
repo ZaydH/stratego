@@ -224,13 +224,17 @@ class Player:
         r""" Accessor for the \p Player's \p MoveSet"""
         return self._move_set
 
-    def add_piece(self, piece: Piece) -> None:
+    def add_piece(self, piece: Piece, other: 'Player' = None) -> None:
         r""" Add \p piece to \p Player's set of pieces """
         assert piece not in self._pieces, "Duplicate piece"
         assert piece.loc not in self._locs, "Two pieces in same location"
 
         self._pieces.add(piece)
         self._locs[piece.loc] = piece
+
+        if other is not None:
+            assert self._color != other.color
+            self.move_set.add_piece(piece, self._locs, other._locs)
 
     def delete_piece_info(self, piece: Piece, other: 'Player') -> None:
         r""" Remove \p piece from the \p Player's set of pieces """
@@ -242,11 +246,6 @@ class Player:
         r""" Update the MoveSet information after deleting a piece at Location \p loc """
         assert self._color != other.color
         self.move_set.add_moves_after_delete(loc, self._locs, other._locs)
-
-    def add_moveset_info(self, piece: Piece, other: 'Player') -> None:
-        r""" Update the MoveSet after adding \p piece """
-        assert self._color != other.color
-        self.move_set.add_piece(piece, self._locs, other._locs)
 
     def update_moveset_after_add(self, loc: Location, other: 'Player') -> None:
         r"""
