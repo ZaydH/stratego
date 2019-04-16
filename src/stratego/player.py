@@ -76,38 +76,37 @@ class MoveSet:
         # Verify color is same for all pieces
         assert piece.color == self._color, "Piece set has pieces of different colors"
 
+        # Standard function for either adding or deleting a move
+        def _process_func(_p: Piece, _loc: Location):
+            if add:
+                try: self._add_move(_p, _loc, other_locs[_loc])
+                except KeyError: self._add_move(_p, _loc)
+            else: self._del_move(_p, _loc)
+
         # Bombs and flags can be ignored
-        if piece.is_immobile():
-            return
+        if piece.is_immobile(): return
         # Check ordinary pieces
         if piece.rank != Rank.scout():
             for loc in piece.loc.neighbors():
                 # Ignore pieces not allowed by board or where piece of same color
                 if not self._brd.is_inside(loc) or loc in locs: continue
-
-                if add:
-                    self._add_move(piece, loc)
-                else:
-                    self._del_move(piece, loc)
+                _process_func(piece, loc)
         # Check scout pieces specially
         else:
             for direction_list in self._brd.to_edge_lists(piece.loc):
                 for loc in direction_list:
                     # If scout blocked by board location or same color, immediately stop
                     if not self._brd.is_inside(loc) or loc in locs: break
-                    if add:
-                        self._add_move(piece, loc)
-                    else:
-                        self._del_move(piece, loc)
+                    _process_func(piece, loc)
                     if loc in other_locs: break
 
-    def _add_move(self, p: Piece, other: Location) -> None:
+    def _add_move(self, p: Piece, other: Location, attacked: Optional[Piece] = None) -> None:
         r""" Add \p piece's move to \p other to the \p MoveSet """
         assert p.is_scout() or p.loc.is_adjacent(other)
 
         key = self._make_move_key(p.loc, other)
         # assert key not in self._avail
-        self._avail[key] = Move(p, p.loc, other)
+        self._avail[key] = Move(p, p.loc, other, attacked)
 
     def _del_move(self, p: Piece, other: Location) -> None:
         r"""
@@ -171,6 +170,10 @@ class MoveSet:
         el = self._brd.to_edge_lists(loc)
         el_groups = [(el.right, el.left), (el.left, el.right), (el.up, el.down), (el.down, el.up)]
 
+        def _add_func(_p: Piece, _loc: Location):
+            try: self._add_move(_p, _loc, other_locs[_loc])
+            except KeyError: self._add_move(_p, _loc)
+
         for search, opp in el_groups:
             # Find first piece in search direction (if any)
             p = None
@@ -183,14 +186,17 @@ class MoveSet:
             # If found p is not a scout and not adjacent, move on
             if not p.is_scout() and not p.loc.is_adjacent(loc): continue
 
-            if add: self._add_move(p, loc)
-            elif loc in plyr_locs: self._del_move(p, loc)
+            # Delete first since may need to add in next step
+            if not add: self._del_move(p, loc)
+            # In an add, always add the move.  In a delete, may need to add back if the moved
+            # piece is of the other player's color
+            if add or loc in other_locs: _add_func(p, loc)
 
             if p.is_scout():
                 for srch in opp:
                     if srch in plyr_locs: break
 
-                    if add: self._add_move(p, srch)
+                    if add: _add_func(p, srch)
                     else: self._del_move(p, srch)
 
                     # Perform second since could still attack

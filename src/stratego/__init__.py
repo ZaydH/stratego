@@ -106,15 +106,18 @@ class Game:
             print("")
             if wait_time > 0: time.sleep(wait_time)
 
+        num_moves = 0
         cur, other = (a1, a2) if a1.color == self._state.next_player.color else (a2, a1)
         while not self._state.is_game_over():
             m = cur.get_next_move()
             self.play_move(m, display)
             if wait_time > 0: time.sleep(wait_time)
             cur, other = other, cur
+            num_moves += 1
 
         if display:
             print("Game over.  Player %d won" % other.color.name)
+            print("Number of Moves: %d", num_moves)
 
     def display_current(self):
         r""" Displays the current state of the game to the console """

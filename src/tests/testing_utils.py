@@ -9,6 +9,7 @@ BOARDS_PATH = Path("tests/boards")
 STATES_PATH = Path("tests/states")
 
 # Standard board file
+SMALL_BRD = Board.importer(BOARDS_PATH / "small.txt")
 STD_BRD = Board.importer(BOARDS_PATH / "standard.txt")
 
 

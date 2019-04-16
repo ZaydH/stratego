@@ -10,6 +10,16 @@ def _main_hard_coded():
     game = Game("boards/small.txt", "states/small_debug.txt", visibility=Printer.Visibility.ALL)
     game.display_current()
 
+    # from statego.location import Location
+    # available_moves = game._state.red.move_set.avail
+    # values = list(available_moves.values())
+    # v = [v for v in values if v.orig == Location(0, 3) and v.new == Location(7, 3)]
+    # assert v
+    # v = v[0]
+    # game.play_move(v, True)
+    # game.display_current()
+    # return
+
     game.move((0, 1), (1, 1))
     game.display_current()
 

@@ -101,8 +101,9 @@ class State:
         # Define the initial set of moves each player can make
         Move.set_board(brd)
         MoveSet.set_board(brd)
-        for plyr, other in [(state._red, state._blue), (state._blue, state._red)]:
-            plyr.build_move_set(other)
+
+        state.red.build_move_set(state.blue)
+        state.blue.build_move_set(state.red)
 
         # Create the state printer
         state._printer = Printer(state._brd, state.red.pieces(), state.blue.pieces(), vis)

@@ -1,11 +1,48 @@
 import pytest
+from typing import Tuple
 
-from stratego import Move
+from stratego import Move, Game, Printer
 from stratego.location import Location
 from stratego.move import MoveStack
+from stratego.piece import Color
+from stratego.player import Player
 from stratego.state import State
 
-from testing_utils import STATES_PATH, STD_BRD, substr_in_err
+from testing_utils import STATES_PATH, SMALL_BRD, STD_BRD, substr_in_err
+
+
+def _get_move_from_player(plyr: Player, _orig: Tuple[int, int], new: Tuple[int, int]) -> Move:
+    r"""
+    Get the move from (row1, col1) in \p l1 to (row2, col2) in \p l2.
+
+    :param plyr: Player whose move will be extracted
+    :param _orig: Original location to move from
+    :param new: New location to move to
+    :return: Move corresponding to the move pair
+    """
+    available_moves = plyr.move_set.avail
+    values = list(available_moves.values())
+    v = [v for v in values if v.orig == Location(*_orig) and v.new == Location(*new)]
+    assert v
+    return v[0]
+
+
+def _verify_num_pieces_and_move_set_size(state: State, num_red_p: int, num_blue_p: int,
+                                         num_red_mv: int, num_blue_mv: int):
+    r"""
+    Verifies the number of pieces and size of the \p MoveSet
+
+    :param state: State of the game
+    :param num_red_p: Number of remaining RED pieces
+    :param num_blue_p: Number of remaining BLUE pieces
+    :param num_red_mv: Number of available moves for RED
+    :param num_blue_mv: Number of available moves for BLUE
+    """
+    # Standardize assert tests
+    assert state.red.num_pieces == num_red_p
+    assert state.blue.num_pieces == num_blue_p
+    assert len(state.red.move_set) == num_red_mv
+    assert len(state.blue.move_set) == num_blue_mv
 
 
 def test_duplicate_loc_in_state():
@@ -41,15 +78,8 @@ def test_state_moves():
 
     state = State.importer(path, STD_BRD)
 
-    # Standardize assert tests
-    def _test_num_pieces_and_move_set_size(_num_red_p, _num_blue_p, _num_red_mv, _num_blue_mv):
-        assert state.red.num_pieces == _num_red_p
-        assert state.blue.num_pieces == _num_blue_p
-        assert len(state.red.move_set) == _num_red_mv
-        assert len(state.blue.move_set) == _num_blue_mv
-
     # Verify initial state matches expectations
-    _test_num_pieces_and_move_set_size(7, 7, 4 + 3, 4 + 3)
+    _verify_num_pieces_and_move_set_size(7, 7, 4 + 3, 4 + 3)
 
     move_stack = MoveStack()
     # Define a series of moves.  Entries in each tuple are:
@@ -87,7 +117,7 @@ def test_state_moves():
         assert state.update(move_stack.top())
         assert state._printer._is_loc_empty(orig)
 
-        _test_num_pieces_and_move_set_size(num_red_p, num_blue_p, num_red_mv, num_blue_mv)
+        _verify_num_pieces_and_move_set_size(num_red_p, num_blue_p, num_red_mv, num_blue_mv)
         printer_out.append(state.write_board())
 
     # Try to move red bomb then the red flag
@@ -106,5 +136,61 @@ def test_state_moves():
         state.undo()
 
         assert state.write_board() == printer_out[-i], "Printer mismatch after do/undo"
-        _test_num_pieces_and_move_set_size(num_red_p, num_blue_p, num_red_mv, num_blue_mv)
+        _verify_num_pieces_and_move_set_size(num_red_p, num_blue_p, num_red_mv, num_blue_mv)
+
+
+def test_small_direct_attack():
+    r""" Test making a direct attack """
+    move_list = [(Color.BLUE, Color.RED, (7, 3), (1, 3), 7, 7, 12, 12),
+                 (Color.RED, Color.BLUE, (0, 3), (7, 3), 6, 6, 5, 5)
+                 ]
+    _helper_small_test(move_list)
+
+
+def test_small_move_then_attack():
+    r""" Test making a single move with a scout then a direct attack """
+    move_list = [(Color.BLUE, Color.RED, (7, 3), (1, 3), 7, 7, 12, 12),
+                 (Color.RED, Color.BLUE, (0, 3), (1, 3), 7, 7, 19, 11),
+                 (Color.BLUE, Color.RED, (7, 3), (1, 3), 6, 6, 5, 5)
+                 ]
+    _helper_small_test(move_list)
+
+
+# noinspection PyProtectedMember
+def _helper_small_test(move_info):
+    r"""
+    Helper function for testing the movements on the small board
+
+    :param move_info: List of move information.  For :math:`n` moves, the length of \p move_info
+                      should be :math:`n+1`.  The first element is the initial board configuration.
+    """
+    path = STATES_PATH / "moveset_small_direct_attack.txt"
+    assert path.exists(), "Small direct attack state file not found"
+    state = State.importer(path, SMALL_BRD)
+
+    # Test doing moves
+    moves, brd = [], [state.write_board()]
+    for col, other_col, l1, l2, num_red_p, num_blue_p, num_red_mv, num_blue_mv in move_info[1:]:
+        plyr, other = state.get_player(col), state.get_player(other_col)
+
+        m = _get_move_from_player(plyr, l1, l2)
+        moves.append(m)
+        state.update(moves[-1])
+        brd.append([state.write_board()])
+        _verify_num_pieces_and_move_set_size(state, num_red_p, num_blue_p,
+                                             num_red_mv, num_blue_mv)
+
+    # Test undoing the moves
+    for i in range(1, len(moves) - 1):
+        assert brd[-i] == state.write_board()
+
+        _, _, l1, l2, num_red_p, num_blue_p, num_red_mv, num_blue_mv = move_info[-i]
+        _verify_num_pieces_and_move_set_size(state, num_red_p, num_blue_p,
+                                             num_red_mv, num_blue_mv)
+        assert moves[-i] == state._stack.top()
+
+        _, _, _, _, num_red_p, num_blue_p, num_red_mv, num_blue_mv = move_info[-i - 1]
+        _verify_num_pieces_and_move_set_size(state, num_red_p, num_blue_p,
+                                             num_red_mv, num_blue_mv)
+        assert brd[-i - 1] == state.write_board()
 
