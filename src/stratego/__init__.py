@@ -117,7 +117,7 @@ class Game:
 
         if display:
             print("Game over.  Player %s won" % other.color.name)
-            print("Number of Moves: %d", num_moves)
+            print("Number of Moves:", num_moves)
 
     def display_current(self):
         r""" Displays the current state of the game to the console """
