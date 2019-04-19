@@ -76,7 +76,8 @@ class Game:
             return False
 
         if display:
-            print("Player: %s moved from %s to %s\n" % (m.piece.color, m.orig, m.new))
+            print("Player: %s (Rank %s) moved from %s to %s\n"
+                  % (m.piece.color.name, m.piece.rank, m.orig, m.new))
             sys.stdout.flush()
 
         if not self._state.update(m): return False
@@ -116,7 +117,7 @@ class Game:
             num_moves += 1
 
         if display:
-            print("Game over.  Player %s won" % other.color.name)
+            print("Game over.  Player", other.color.name, "won")
             print("Number of Moves:", num_moves)
 
     def display_current(self):
