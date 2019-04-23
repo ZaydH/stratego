@@ -12,11 +12,12 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Union, Tuple
+from typing import Union, Tuple, Optional
 
 # import matplotlib
 from stratego.agent import Agent
 from stratego.location import Location
+from stratego.utils import StrOrPath
 from .move import Move
 from .board import Board
 from .printer import Printer
@@ -88,7 +89,8 @@ class Game:
         return True
 
     def two_agent_automated(self, a1: Agent, a2: Agent, wait_time: float = 0,
-                            display: bool = False) -> None:
+                            display: bool = False, max_num_moves: Optional[int] = None,
+                            moves_output_file: Optional[StrOrPath] = None) -> None:
         r"""
         Simple interface to play
 
@@ -96,29 +98,49 @@ class Game:
         :param a2: Second automated game playing agent (must be opposite color of \p a1)
         :param wait_time: Time (in seconds) to wait between moves.  Must be non-negative
         :param display: If True, display information about the move and the board
-        :return:
+        :param max_num_moves: Maximum number of moves to perform before existing.
+        :param moves_output_file: Path to write the moves made
         """
+        assert a1.color != a2.color, "Both agents cannot be the same color"
+
         if wait_time < 0:
             raise ValueError("wait_time must be non-negative")
-        assert a1.color != a2.color, "Both agents cannot be the same color"
+        if max_num_moves is None: max_num_moves = sys.maxsize
+        if max_num_moves <= 0:
+            raise ValueError("Maximum number of moves must be non-negative")
 
         if display:
             self.display_current()
             print("")
             if wait_time > 0: time.sleep(wait_time)
 
+        w_move = moves_output_file is not None
+        if w_move:
+            f_out = open(moves_output_file, "w+")
+            f_out.write("PlayerColor,StartLoc,EndLoc")
+
         num_moves = 0
         cur, other = (a1, a2) if a1.color == self._state.next_player.color else (a2, a1)
-        while not self._state.is_game_over():
+        while num_moves < max_num_moves and not self._state.is_game_over():
             m = cur.get_next_move()
             self.play_move(m, display)
+
+            if w_move:
+                # noinspection PyUnboundLocalVariable
+                f_out.write("\n%s,%s,%s" % (cur.color.name, m.orig, m.new))
+
             if wait_time > 0: time.sleep(wait_time)
             cur, other = other, cur
             num_moves += 1
 
-        if display:
-            print("Game over.  Player", other.color.name, "won")
-            print("Number of Moves:", num_moves)
+        if w_move:
+            f_out.close()
+        if self._state.is_game_over():
+            if display:
+                print("Game over.  Player", other.color.name, "won")
+                print("Number of Moves:", num_moves)
+        elif num_moves == max_num_moves:
+            print("Maximum number of moves %d reached. Exiting." % max_num_moves)
 
     def display_current(self):
         r""" Displays the current state of the game to the console """

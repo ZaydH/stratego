@@ -1,8 +1,12 @@
 import logging
 import sys
+from pathlib import Path
+from typing import Union
+
+StrOrPath = Union[Path, str]
 
 
-def setup_logger(quiet_mode: bool = False, filename: str = "test.log",
+def setup_logger(quiet_mode: bool = False, filename: StrOrPath = "test.log",
                  log_level: int = logging.DEBUG) -> None:
     r"""
     Logger Configurator
@@ -13,6 +17,8 @@ def setup_logger(quiet_mode: bool = False, filename: str = "test.log",
     :param filename: Log file name
     :param log_level: Level to log
     """
+    if isinstance(filename, Path): filename = str(filename)
+
     date_format = '%m/%d/%Y %I:%M:%S %p'  # Example Time Format - 12/12/2010 11:46:36 AM
     format_str = '%(asctime)s -- %(levelname)s -- %(message)s'
     logging.basicConfig(filename=filename, level=log_level, format=format_str, datefmt=date_format)
