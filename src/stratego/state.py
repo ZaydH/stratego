@@ -170,11 +170,11 @@ class State:
         self._printer.delete_piece(move.orig)
         other = self.get_other_player(mv_plyr)
         mv_plyr.delete_piece_info(move.piece, other)
+        self._delete_moveset_info(move.orig)
 
         # Process the attack (if applicable)
         if move.is_attack():
             self._do_attack(move)
-        self._delete_moveset_info(move.orig)
 
         move.piece.loc = move.new  # Always move the piece even in a loss for consistency
         if move.is_move_successful():
@@ -189,7 +189,7 @@ class State:
     def _delete_moveset_info(self, loc: Location) -> None:
         r"""
         Regardless of whether move or attack, the set of valid movements MAY change for BOTH
-        players.  Therefore,
+        players.  Therefore, delete moveset information clearing out \p loc
 
         :param loc: Location of the \p MoveSet information to be deleted
         """

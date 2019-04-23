@@ -9,6 +9,7 @@ r"""
     :license: MIT, see LICENSE for more details.
 """
 import logging
+import re
 import sys
 import time
 from pathlib import Path
@@ -17,7 +18,7 @@ from typing import Union, Tuple, Optional
 # import matplotlib
 from stratego.agent import Agent
 from stratego.location import Location
-from stratego.utils import StrOrPath
+from stratego.utils import PathOrStr
 from .move import Move
 from .board import Board
 from .printer import Printer
@@ -52,8 +53,7 @@ class Game:
         p = self._state.next_player.get_piece_at_loc(orig)
         if p is None:
             fields = (self._state.next_color.name, orig.r, orig.c)
-            logging.warning("No %s piece at location (%d,%d)", *fields)
-            return False
+            raise ValueError("No %s piece at location (%d,%d)", *fields)
 
         other = self._state.get_other_player(self._state.next_player)
         attacked = other.get_piece_at_loc(new)
@@ -90,7 +90,7 @@ class Game:
 
     def two_agent_automated(self, a1: Agent, a2: Agent, wait_time: float = 0,
                             display: bool = False, max_num_moves: Optional[int] = None,
-                            moves_output_file: Optional[StrOrPath] = None) -> None:
+                            moves_output_file: Optional[PathOrStr] = None) -> None:
         r"""
         Simple interface to play
 
@@ -123,11 +123,10 @@ class Game:
         cur, other = (a1, a2) if a1.color == self._state.next_player.color else (a2, a1)
         while num_moves < max_num_moves and not self._state.is_game_over():
             m = cur.get_next_move()
-            self.play_move(m, display)
-
             if w_move:
                 # noinspection PyUnboundLocalVariable
                 f_out.write("\n%s,%s,%s" % (cur.color.name, m.orig, m.new))
+            self.play_move(m, display)
 
             if wait_time > 0: time.sleep(wait_time)
             cur, other = other, cur
@@ -141,6 +140,20 @@ class Game:
                 print("Number of Moves:", num_moves)
         elif num_moves == max_num_moves:
             print("Maximum number of moves %d reached. Exiting." % max_num_moves)
+
+    def _execute_move_file(self, moves_file: PathOrStr) -> None:
+        try:
+            with open(moves_file, "r") as f_in:
+                lines = f_in.read().splitlines()
+        except IOError:
+            raise IOError("Unable to read moves file: \"%s\"" % str(moves_file))
+        # Match a color string then the move ",(row,col)" twice
+        move_regex = re.compile(r"(\w+),\((\d+),(\d+)\),\((\d+),(\d+)\)")
+        for l in lines[1:]:  # Skip header line
+            if not move_regex.match(l): raise ValueError("Unable to parse move \"%s\"" % l)
+            res = re.findall(r"\d+", l)
+            locs = [(int(res[i]), int(res[i+1])) for i in range(0, 3, 2)]
+            self.move(*locs)
 
     def display_current(self):
         r""" Displays the current state of the game to the console """

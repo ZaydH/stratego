@@ -141,7 +141,7 @@ def test_state_moves():
 
 def test_small_direct_attack():
     r""" Test making a direct attack """
-    move_list = [(Color.BLUE, Color.RED, (7, 3), (1, 3), 7, 7, 11, 11),
+    move_list = [(None, None, None, None, 7, 7, 11, 11),
                  (Color.RED, Color.BLUE, (0, 3), (7, 3), 6, 6, 5, 5)
                  ]
     _helper_small_test(move_list)
@@ -149,22 +149,30 @@ def test_small_direct_attack():
 
 def test_small_move_then_attack():
     r""" Test making a single move with a scout then a direct attack """
-    move_list = [(Color.BLUE, Color.RED, (7, 3), (1, 3), 7, 7, 11, 11),
+    move_list = [(None, None, None, None, 7, 7, 11, 11),
                  (Color.RED, Color.BLUE, (0, 3), (1, 3), 7, 7, 19, 10),
                  (Color.BLUE, Color.RED, (7, 3), (1, 3), 6, 6, 5, 5)
                  ]
     _helper_small_test(move_list)
 
 
+def test_single_adjacent_scout():
+    r""" Test making a single move with a scout then a direct attack """
+    move_list = [(None, None, None, None, 2, 2, 11, 11),
+                 (Color.BLUE, Color.BLUE, (2, 4), (2, 3), 1, 1, 0, 0)
+                 ]
+    _helper_small_test(move_list, state_file="moveset_two_scouts_adjacent.txt")
+
+
 # noinspection PyProtectedMember
-def _helper_small_test(move_info):
+def _helper_small_test(move_info, state_file: str =  "moveset_small_direct_attack.txt"):
     r"""
     Helper function for testing the movements on the small board
 
     :param move_info: List of move information.  For :math:`n` moves, the length of \p move_info
                       should be :math:`n+1`.  The first element is the initial board configuration.
     """
-    path = STATES_PATH / "moveset_small_direct_attack.txt"
+    path = STATES_PATH / state_file
     assert path.exists(), "Small direct attack state file not found"
     state = State.importer(path, SMALL_BRD)
 

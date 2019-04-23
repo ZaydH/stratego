@@ -3,10 +3,10 @@ import sys
 from pathlib import Path
 from typing import Union
 
-StrOrPath = Union[Path, str]
+PathOrStr = Union[Path, str]
 
 
-def setup_logger(quiet_mode: bool = False, filename: StrOrPath = "test.log",
+def setup_logger(quiet_mode: bool = False, filename: PathOrStr = "test.log",
                  log_level: int = logging.DEBUG) -> None:
     r"""
     Logger Configurator
