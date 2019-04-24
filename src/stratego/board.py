@@ -9,7 +9,7 @@ r"""
     :license: MIT, see LICENSE for more details.
 """
 import logging
-from typing import List, Set, Union
+from typing import List, Set, Union, Tuple
 from pathlib import Path
 from enum import Enum
 
@@ -128,6 +128,10 @@ class Board:
     def blocked(self) -> Set[Location]:
         r""" Set of spaces that no piece can enter """
         return self._blocked
+
+    def dim(self) -> Tuple[int, int]:
+        r""" Board dimension tuple in the form (#rows, #cols) """
+        return self.num_rows, self.num_cols
 
     @staticmethod
     # pylint: disable=protected-access

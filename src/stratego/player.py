@@ -1,4 +1,5 @@
 import logging
+import random
 from typing import Set, Generator, Optional
 
 from .location import Location
@@ -268,6 +269,7 @@ class Player:
         :param other: Other player
         """
         assert self._color != other.color
+        # pylint: disable=protected-access
         self.move_set.remove_moves_after_add(loc, self._locs, other._locs)
 
     def has_flag(self) -> bool:
@@ -323,3 +325,8 @@ class Player:
                 logging.warning("Color %s has too many pieces of rank: \"%s\"", self._color.name, r)
                 res = False
         return res
+
+    def get_random_move(self):
+        r""" Selects and returns a move uniformly at random from the set of available moves """
+        values = list(self.move_set.avail.values())
+        return random.choice(values)

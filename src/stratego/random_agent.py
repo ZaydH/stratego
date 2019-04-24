@@ -11,6 +11,4 @@ class RandomAgent(Agent):
 
     def get_next_move(self) -> Move:
         r""" Gets a valid move uniformly at random """
-        available_moves = self._plyr.move_set.avail
-        values = list(available_moves.values())
-        return random.choice(values)
+        return self._plyr.get_random_move()

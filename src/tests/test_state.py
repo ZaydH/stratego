@@ -165,7 +165,7 @@ def test_single_adjacent_scout():
 
 
 # noinspection PyProtectedMember
-def _helper_small_test(move_info, state_file: str =  "moveset_small_direct_attack.txt"):
+def _helper_small_test(move_info, state_file: str = "moveset_small_direct_attack.txt"):
     r"""
     Helper function for testing the movements on the small board
 
@@ -204,4 +204,3 @@ def _helper_small_test(move_info, state_file: str =  "moveset_small_direct_attac
         _verify_num_pieces_and_move_set_size(state, num_red_p, num_blue_p,
                                              num_red_mv, num_blue_mv)
         assert brd[-i - 1] == state.write_board()
-

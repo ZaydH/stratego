@@ -35,3 +35,4 @@ def substr_in_err(substr: str, e_info: ExceptionInfo) -> bool:
     :return: True if the substr appears in \p e_info's error
     """
     return substr.lower() in str(e_info.value).lower()
+
