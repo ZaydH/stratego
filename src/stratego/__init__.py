@@ -16,13 +16,14 @@ from pathlib import Path
 from typing import Union, Tuple, Optional
 
 # import matplotlib
-from stratego.agent import Agent
-from stratego.location import Location
-from stratego.utils import PathOrStr
-from .move import Move
+from .agent import Agent
 from .board import Board
+from .location import Location
+from .move import Move
+from .player import Player
 from .printer import Printer
 from .state import State
+from .utils import PathOrStr
 
 
 class Game:
@@ -40,6 +41,16 @@ class Game:
         Move.set_board(self._brd)
 
         self._state = State.importer(state_path, self._brd, visibility)
+
+    @property
+    def red(self) -> Player:
+        r""" Accessor for the RED player """
+        return self._state.red
+
+    @property
+    def blue(self) -> Player:
+        r""" Accessor for the BLUE player """
+        return self._state.blue
 
     def move(self, cur_loc: Tuple[int, int], new_loc: Tuple[int, int]) -> bool:
         r"""

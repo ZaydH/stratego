@@ -1,6 +1,9 @@
 from pathlib import Path
 from typing import Optional, Set
 
+# noinspection PyProtectedMember
+from _pytest._code import ExceptionInfo
+
 from stratego.board import Board
 from stratego.location import Location
 
@@ -23,9 +26,9 @@ def build_test_board(num_rows: int, num_cols: int,
 
 
 # noinspection PyUnresolvedReferences
-def substr_in_err(substr: str, e_info: 'ExceptionInfo') -> bool:
+def substr_in_err(substr: str, e_info: ExceptionInfo) -> bool:
     r"""
-    Case insensitive check of cubstring in the error raised
+    Case insensitive check of substring in the error raised
 
     :param substr: String to check if contained in error message
     :param e_info: Error information

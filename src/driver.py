@@ -39,8 +39,7 @@ def _main_hard_coded():
 
 def _main_random():
     game = Game("boards/small.txt", "states/test_debug.txt", visibility=Printer.Visibility.ALL)
-    # noinspection PyProtectedMember
-    a1, a2 = RandomAgent(game._state.red), RandomAgent(game._state.blue)
+    a1, a2 = RandomAgent(game.red), RandomAgent(game.blue)
     # game.two_agent_automated(a1, a2, display=True, wait_time=1)
     game.two_agent_automated(a1, a2, display=True, moves_output_file="moves.txt")
 
