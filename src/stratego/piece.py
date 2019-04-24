@@ -62,6 +62,11 @@ class Rank:
             Rank._all = [Rank(r) for r in all_rank]
         return Rank._all
 
+    @staticmethod
+    def count() -> int:
+        r""" Accessor for the total number of ranks """
+        return len(Rank.get_all())
+
     @property
     def value(self) -> Union[str, int]:
         r""" Accessor for the rank's value """
@@ -183,9 +188,15 @@ class Rank:
 
 
 class Piece:
+    r""" Encapsulates a single piece.  Each individual piece is a separate object """
     _next_id = 0
-    r""" Per piece analysis """
+
     def __init__(self, color: Color, rank: Rank, loc: Location):
+        r"""
+        :param color: New piece's color
+        :param rank: New piece's rank
+        :param loc: Location of the new piece
+        """
         self._color = color
         self._rank = rank
         self._loc = loc

@@ -117,7 +117,8 @@ class Game:
         w_move = moves_output_file is not None
         if w_move:
             f_out = open(moves_output_file, "w+")
-            f_out.write("PlayerColor,StartLoc,EndLoc")
+            # Add header row for improved file readability
+            f_out.write("# PlayerColor,StartLoc,EndLoc")
 
         num_moves = 0
         cur, other = (a1, a2) if a1.color == self._state.next_player.color else (a2, a1)
@@ -141,7 +142,18 @@ class Game:
         elif num_moves == max_num_moves:
             print("Maximum number of moves %d reached. Exiting." % max_num_moves)
 
-    def _execute_move_file(self, moves_file: PathOrStr) -> None:
+    def _execute_move_file(self, moves_file: PathOrStr, display_after_move: bool = False) -> None:
+        r"""
+        Debug method to execute a set of moves in file \p moves_file.  Each move is specified on a
+        separate line with the format:
+
+            \p PIECE_COLOR,(ORIG_ROW,ORIG_COL),(NEW_ROW,NEW_COL)
+
+        Blank lines or those starting with \"#\" are ignored.
+
+        :param moves_file: File containing the moves to be performed
+        :param display_after_move: If True, print the board state after each move
+        """
         try:
             with open(moves_file, "r") as f_in:
                 lines = f_in.read().splitlines()
@@ -149,11 +161,15 @@ class Game:
             raise IOError("Unable to read moves file: \"%s\"" % str(moves_file))
         # Match a color string then the move ",(row,col)" twice
         move_regex = re.compile(r"(\w+),\((\d+),(\d+)\),\((\d+),(\d+)\)")
-        for l in lines[1:]:  # Skip header line
-            if not move_regex.match(l): raise ValueError("Unable to parse move \"%s\"" % l)
-            res = re.findall(r"\d+", l)
+        for line in lines[1:]:  # Skip header line
+            line = line.strip()
+            # Skip blank lines or those starting with "#"
+            if not line or line[0] == "#": continue
+            if not move_regex.match(line): raise ValueError("Unable to parse move \"%s\"" % line)
+            res = re.findall(r"\d+", line)
             locs = [(int(res[i]), int(res[i+1])) for i in range(0, 3, 2)]
             self.move(*locs)
+            if display_after_move: self.display_current()
 
     def display_current(self):
         r""" Displays the current state of the game to the console """
