@@ -14,6 +14,7 @@ STATES_PATH = Path("tests/states")
 # Standard board file
 SMALL_BRD = Board.importer(BOARDS_PATH / "small.txt")
 STD_BRD = Board.importer(BOARDS_PATH / "standard.txt")
+NO_BLOCK_BRD = Board.importer(BOARDS_PATH / "no_blocked_standard.txt")
 
 
 def build_test_board(num_rows: int, num_cols: int,
