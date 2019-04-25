@@ -326,7 +326,7 @@ class Player:
                 res = False
         return res
 
-    def get_random_move(self):
+    def get_random_move(self) -> Move:
         r""" Selects and returns a move uniformly at random from the set of available moves """
         values = list(self.move_set.avail.values())
         return random.choice(values)

@@ -1,6 +1,7 @@
+import itertools
 from enum import Enum
 from pathlib import Path
-from typing import Union
+from typing import Union, Iterable
 
 from stratego import Printer
 from .board import Board
@@ -57,6 +58,15 @@ class State:
     def blue(self) -> Player:
         r""" Accessor for the BLUE player """
         return self._blue
+
+    @property
+    def board(self) -> Board:
+        r""" Accessor for the board associated with the \p State """
+        return self._brd
+
+    def pieces(self) -> Iterable[Piece]:
+        r""" Constructs an iterable for the set of all (remaining) pieces in the current \p State"""
+        return itertools.chain(self.red.pieces(), self.blue.pieces())
 
     @staticmethod
     # pylint: disable=protected-access
@@ -218,9 +228,9 @@ class State:
             raise ValueError(m)
 
         for _ in range(num_moves):
-            self._rollback()
+            self.rollback()
 
-    def _rollback(self):
+    def rollback(self):
         r""" Rollback move on the top of the \p MoveStack """
         m = self._stack.top()
         mv_plyr = self.get_player(m.piece.color)
