@@ -22,8 +22,8 @@ class HumanAgent(Agent):
                 print("\nInvalid input. Try again\n")
                 continue
 
+            locs = [int(x) for x in re.findall(r"\d+", m_str)]
             try:
-                locs = [int(x) for x in re.findall(r"\d+", m_str)]
                 orig, new = Location(*locs[:2]), Location(*locs[2:])
             except ValueError:
                 print("\nIt appears you entered an invalid location. Try again\n")
