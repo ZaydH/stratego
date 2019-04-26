@@ -287,6 +287,15 @@ class Player:
         assert piece is not None
         return self.move_set.has_move(piece, new_loc)
 
+    def is_valid_next(self, m: Move) -> bool:
+        r"""
+        Checks whether move \m is in the player's \p MoveSet
+
+        :param m: \p Move to check
+        :return: True if \p m is a valid next move.
+        """
+        return m in self.move_set
+
     def get_move(self, piece: Piece, new_loc: Location) -> Optional[Move]:
         r""" Returns \p True if the player has a move for the piece ot the specified \p Location """
         assert piece is not None
