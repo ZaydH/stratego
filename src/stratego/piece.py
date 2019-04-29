@@ -3,9 +3,9 @@ r"""
     stratego.piece
     ~~~~~~~~~~~~~~
 
-    Encapsulates the \p Rank and \p Pieces classes
+    Implementation of the \p Rank and \p Pieces classes
 
-    :copyright: (c) 2019 by Steven Walton & Zayd Hammoudeh.
+    :copyright: (c) 2019 by Zayd Hammoudeh.
     :license: MIT, see LICENSE for more details.
 """
 

@@ -5,7 +5,7 @@ r"""
 
     Setup needed for continuous integration.
 
-    :copyright: (c) 2019 by Steven Walton & Zayd Hammoudeh.
+    :copyright: (c) 2019 by Zayd Hammoudeh.
     :license: MIT, see LICENSE for more details.
 """
 

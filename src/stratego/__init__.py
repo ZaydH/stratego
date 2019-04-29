@@ -3,9 +3,9 @@ r"""
     stratego.__init__
     ~~~~~~~~~~~~~~~~~
 
-    Master game file.
+    Implements the master \p Game class.
 
-    :copyright: (c) 2019 by Steven Walton and Zayd Hammoudeh.
+    :copyright: (c) 2019 by Zayd Hammoudeh.
     :license: MIT, see LICENSE for more details.
 """
 import logging
