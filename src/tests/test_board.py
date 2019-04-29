@@ -1,3 +1,14 @@
+# -*- coding: utf-8 -*-
+r"""
+    tests.test_board
+    ~~~~~~~~~~~~~~~~
+
+    Test functions for the Stratego \p Board class.
+
+    :copyright: (c) 2019 by Zayd Hammoudeh.
+    :license: MIT, see LICENSE for more details.
+"""
+
 from stratego.board import Board
 from stratego.location import Location
 

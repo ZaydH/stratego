@@ -1,5 +1,17 @@
-import pytest
+# -*- coding: utf-8 -*-
+r"""
+    tests.test_state
+    ~~~~~~~~~~~~~~~~
+
+    Tests for the \p State class including movement mechanics and enumeration of the \p MoveSet
+    class.
+
+    :copyright: (c) 2019 by Zayd Hammoudeh.
+    :license: MIT, see LICENSE for more details.
+"""
+
 from typing import Tuple
+import pytest
 
 from stratego import Move, Game, Printer
 from stratego.location import Location
@@ -8,7 +20,7 @@ from stratego.piece import Color
 from stratego.player import Player
 from stratego.state import State
 
-from testing_utils import STATES_PATH, SMALL_BRD, STD_BRD, substr_in_err
+from testing_utils import STATES_PATH, SMALL_BRD, STD_BRD
 
 
 def _get_move_from_player(plyr: Player, _orig: Tuple[int, int], new: Tuple[int, int]) -> Move:
@@ -72,7 +84,8 @@ def test_no_flag():
 
 
 # noinspection PyProtectedMember
-def test_state_moves():
+def test_state_basic_moves():
+    r""" Verify the basic movement mechanics work without issue """
     path = STATES_PATH / "state_move_verify.txt"
     assert path.exists(), "Move verify file does not exist"
 
@@ -88,7 +101,7 @@ def test_state_moves():
     #   2: Number of red pieces
     #   3: Number of blue pieces
     #   4: Size of the red move set
-    #   %: Size of the blue move set
+    #   5: Size of the blue move set
     move_list = [((0, 1), (1, 1), 7, 7, 12, 7),
                  ((9, 1), (8, 1), 7, 7, 12, 12),
                  ((1, 1), (2, 1), 7, 7, 12, 12),
@@ -182,7 +195,7 @@ def _helper_small_test(move_info, state_file: str = "moveset_small_direct_attack
     # Test doing moves
     moves, brd = [], [state.write_board()]
     for col, other_col, l1, l2, num_red_p, num_blue_p, num_red_mv, num_blue_mv in move_info[1:]:
-        plyr, other = state.get_player(col), state.get_player(other_col)
+        plyr, _ = state.get_player(col), state.get_player(other_col)
 
         m = _get_move_from_player(plyr, l1, l2)
         moves.append(m)
@@ -195,10 +208,10 @@ def _helper_small_test(move_info, state_file: str = "moveset_small_direct_attack
     for i in range(1, len(moves) - 1):
         assert brd[-i] == state.write_board()
 
-        _, _, l1, l2, num_red_p, num_blue_p, num_red_mv, num_blue_mv = move_info[-i]
+        _, _, _, _, num_red_p, num_blue_p, num_red_mv, num_blue_mv = move_info[-i]
         _verify_num_pieces_and_move_set_size(state, num_red_p, num_blue_p,
                                              num_red_mv, num_blue_mv)
-        assert moves[-i] == state._stack.top()
+        assert moves[-i] == state._stack.top()  # pylint: disable=protected-access
 
         _, _, _, _, num_red_p, num_blue_p, num_red_mv, num_blue_mv = move_info[-i - 1]
         _verify_num_pieces_and_move_set_size(state, num_red_p, num_blue_p,

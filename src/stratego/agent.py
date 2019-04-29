@@ -1,3 +1,14 @@
+# -*- coding: utf-8 -*-
+r"""
+    stratego.agent
+    ~~~~~~~~~~~~~~
+
+    Abstract class \p Agent that other agents will inherity
+
+    :copyright: (c) 2019 by Zayd Hammoudeh.
+    :license: MIT, see LICENSE for more details.
+"""
+
 from abc import ABC, abstractmethod
 
 from .move import Move

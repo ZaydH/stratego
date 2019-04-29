@@ -5,6 +5,7 @@ from stratego.printer import Printer
 from testing_utils import build_test_board
 
 
+# pylint: disable=protected-access
 # noinspection PyProtectedMember
 def test_printer_piece_movement():
     r""" Verify piece movement as part of the \p Printer """

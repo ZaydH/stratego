@@ -1,12 +1,18 @@
+# -*- coding: utf-8 -*-
+r"""
+    tests.test_moveset
+    ~~~~~~~~~~~~~~~~~~
+
+    Tests the construction of the \p MoveSet class.
+
+    :copyright: (c) 2019 by Zayd Hammoudeh.
+    :license: MIT, see LICENSE for more details.
+"""
+
 from stratego.location import Location
 from stratego.state import State
 
 from testing_utils import STATES_PATH, STD_BRD
-
-
-# Create a dummy board for use in comparison in the movements
-num_brd_rows = num_brd_cols = 10
-blocked_loc = Location(3, 2)
 
 
 def test_basic_board():

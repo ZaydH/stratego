@@ -1,16 +1,24 @@
+# -*- coding: utf-8 -*-
+r"""
+    tests.test_move
+    ~~~~~~~~~~~~~~~
+
+    Verifies basic \p Move object construction including verify error conditions actually raise
+    errors.
+
+    :copyright: (c) 2019 by Zayd Hammoudeh.
+    :license: MIT, see LICENSE for more details.
+"""
+
 import pytest
 
 from stratego.location import Location
 from stratego.move import Move
 from stratego.piece import Color, Piece, Rank
 
-from testing_utils import build_test_board, substr_in_err
+from testing_utils import STD_BRD, build_test_board, substr_in_err
 
-# Create a dummy board for use in comparison in the movements
-num_brd_rows = num_brd_cols = 10
-blocked_loc = Location(3, 2)
-
-Move.set_board(build_test_board(num_brd_rows, num_brd_cols, {blocked_loc}))
+Move.set_board(STD_BRD)
 
 
 def test_verify_neighbor_movements():
@@ -41,23 +49,24 @@ def test_outside_board_moves():
         assert e_info.type == ValueError
 
     # Test right and bottom boundaries
-    l_orig = Location(num_brd_rows - 1, num_brd_cols - 1)
+    l_orig = Location(STD_BRD.num_rows - 1, STD_BRD.num_cols - 1)
     p = Piece(Color.RED, Rank.marshall(), l_orig)
     for l_new in [l_orig.right(), l_orig.down()]:
         with pytest.raises(Exception) as e_info:
             Move(p, l_orig, l_new)
         assert e_info.type == ValueError
 
+    blocked_loc = Location(4, 2)
     # Verify a blocked location cannot be used as original location
     p = Piece(Color.RED, Rank.marshall(), blocked_loc)
     with pytest.raises(Exception) as e_info:
         Move(p, blocked_loc, blocked_loc.up())
     assert e_info.type == ValueError
 
-    # Verify a blocked location cannot be used as original location
+    # Verify a blocked location cannot be used as new location
     p = Piece(Color.RED, Rank.marshall(), blocked_loc.up())
     with pytest.raises(Exception) as e_info:
-        Move(p, blocked_loc, blocked_loc)
+        Move(p, blocked_loc.up(), blocked_loc)
     assert e_info.type == ValueError
 
 
@@ -108,9 +117,9 @@ def test_diagonal_movement():
 
 def test_scout_movements():
     r""" Verify that only scouts can move multiple squares at once """
-    loc = Location(num_brd_rows // 2, num_brd_cols // 2)
+    loc = Location(3, STD_BRD.num_cols // 2)
 
-    # Just make sure color doesn't matter (it may be a dumb test)
+    # Just make sure color of the Scout has not effect (it may be a dumb test)
     for color in [Color.RED, Color.BLUE]:
         scout, miner = Piece(color, Rank.scout(), loc), Piece(color, Rank.miner(), loc)
         for p in [scout, miner]:

@@ -1,3 +1,14 @@
+# -*- coding: utf-8 -*-
+r"""
+    tests.testing_utils
+    ~~~~~~~~~~~~~~~~~~~
+
+    Helper methods used in the Stratego test suite.
+
+    :copyright: (c) 2019 by Zayd Hammoudeh.
+    :license: MIT, see LICENSE for more details.
+"""
+
 from pathlib import Path
 from typing import Optional, Set
 
