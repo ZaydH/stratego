@@ -232,7 +232,8 @@ class Piece:
         return self.rank > other.rank
 
     def __eq__(self, other: 'Piece') -> bool:
-        assert self.color != other.color, "Player cannot attack itself"
+        # Cannot perform assert check below because of equivalence check of Move objects
+        # assert self.color != other.color, "Player cannot attack itself"
         return self.rank == other.rank
 
     def __hash__(self) -> int:

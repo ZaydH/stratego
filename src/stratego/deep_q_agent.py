@@ -159,7 +159,7 @@ class ReplayStateTuple:
     s: State = None
     a: Move = None
     base_tensor: torch.Tensor = None
-    r: float = None
+    r: torch.Tensor = None
 
     def is_terminal(self) -> bool:
         r""" Returns True if this state is terminal """
@@ -214,9 +214,10 @@ class DeepQAgent(Agent, nn.Module):
     _M = 100000
     _T = 400  # Maximum number of moves for a state
     _EPS_START = 0.25
+    _gamma = 0.98
     _lr = 1e-4
     _f_loss = nn.MSELoss()
-    _INVALID_MOVE_REWARD = -2 * torch.ones((1, 1))
+    _INVALID_MOVE_REWARD = - torch.ones((1, 1))  # Must be -1 since output is tanh
     _LOSS_REWARD = -torch.ones_like(_INVALID_MOVE_REWARD)
     _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
 
@@ -309,7 +310,7 @@ class DeepQAgent(Agent, nn.Module):
                     t.r = self._WIN_REWARD
                 # Game not over yet
                 else:
-                    t.r = 0
+                    t.r = torch.zeros_like(self._WIN_REWARD)
                 self._replay.add(t)
 
                 j = self._replay.get_random()
@@ -320,7 +321,8 @@ class DeepQAgent(Agent, nn.Module):
                     # ToDo Need to fix how board state measured since player changed after this move
                     x_j = DeepQAgent._build_input_tensor(t.base_tensor, t.s.pieces(),
                                                          t.s.next_player)
-                    y_j -= self._gamma * torch.max(self.forward(x_j))
+                    y_j_1_val, _ = torch.max(self.forward(x_j), dim=1, keepdim=True)
+                    y_j = y_j - self._gamma * y_j_1_val
                     # ToDo may need to rollback multiple moves
                     j.s.rollback()
 
@@ -394,7 +396,7 @@ class DeepQAgent(Agent, nn.Module):
         output_node = self._get_output_node_from_move(j.a)
         x = self._build_input_tensor(j.base_tensor, j.s.pieces(), j.s.next_player)
         y = self.forward(x)
-        return y[:, output_node]
+        return y[:, output_node:output_node + 1]
 
     def _convert_output_node_to_move(self, output_node: Union[torch.Tensor, int], plyr: Player,
                                      other: Player) -> Move:
