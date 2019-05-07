@@ -163,8 +163,7 @@ class ReplayStateTuple:
 
     def is_terminal(self) -> bool:
         r""" Returns True if this state is terminal """
-        # noinspection PyProtectedMember
-        return self.r == DeepQAgent._LOSS_REWARD or self.r == DeepQAgent._WIN_REWARD
+        return self.r in DeepQAgent.TERMINAL_REWARDS
 
 
 class ReplayMemory:
@@ -213,11 +212,15 @@ class DeepQAgent(Agent, nn.Module):
 
     # Training parameters
     _M = 100000
+    _T = 400  # Maximum number of moves for a state
     _EPS_START = 0.25
     _lr = 1e-4
-    f_loss = nn.MSELoss()
-    _LOSS_REWARD = -1
-    _WIN_REWARD = 1
+    _f_loss = nn.MSELoss()
+    _INVALID_MOVE_REWARD = -2 * torch.ones((1, 1))
+    _LOSS_REWARD = -torch.ones_like(_INVALID_MOVE_REWARD)
+    _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
+
+    TERMINAL_REWARDS = (_LOSS_REWARD, _WIN_REWARD, _INVALID_MOVE_REWARD)
 
     # Converts rank to a layer
     _rank_lookup = {r: i for i, r in enumerate(Rank.get_all())}
@@ -227,6 +230,8 @@ class DeepQAgent(Agent, nn.Module):
     _impass_layer = _unk_rank_layer + 1
     # Layer indicating whose turn is next
     _next_turn_layer = _impass_layer + 1
+
+    _EXPORTED_MODEL = EXPORT_DIR / "final_deep_q.pth"
 
     def __init__(self, brd: Board, plyr: Player, other: Player, eps_end: float = 1e-4):
         r"""
@@ -259,6 +264,8 @@ class DeepQAgent(Agent, nn.Module):
 
         self._construct_network()
         self._replay = None
+        if DeepQAgent._EXPORTED_MODEL.exists():
+            utils.load_module(self, DeepQAgent._EXPORTED_MODEL)
         # Must be last in constructor to ensure proper CUDA enabling
         if IS_CUDA: self.cuda()
 
@@ -273,6 +280,7 @@ class DeepQAgent(Agent, nn.Module):
         return self._d_out
 
     def train_network(self, s_0: State):
+        Move.DISABLE_ASSERT_CHECKS = True
         self._replay = ReplayMemory()
         optim = torch.optim.Adam(self.parameters(), lr=self._lr)
         eps_range = np.linspace(self._EPS_START, self._EPS_END, num=self._M, endpoint=True)
@@ -284,6 +292,7 @@ class DeepQAgent(Agent, nn.Module):
             logging.info("Starting episode %d of %d", episode, self._M)
             progress_bar = tqdm(range(self._T), total=self._T, file=sys.stdout)
             for _ in progress_bar:
+                self._configure_players(t)
                 # With probability < \epsilon, select a random action
                 if random.random() < self._eps: t.a = self._plyr.get_random_move()
                 # Select (epsilon-)greedy action
@@ -294,16 +303,18 @@ class DeepQAgent(Agent, nn.Module):
                     t.r = self._LOSS_REWARD
                 # Treat illegal moves as an instant loss
                 elif not t.s.next_player.is_valid_next(t.a):
-                    t.r = self._LOSS_REWARD
+                    t.r = self._INVALID_MOVE_REWARD
                 # Player about to win
                 elif t.a.is_attack() and t.a.attacked.rank == Rank.flag():
                     t.r = self._WIN_REWARD
                 # Game not over yet
-                else: t.r = 0
+                else:
+                    t.r = 0
                 self._replay.add(t)
 
                 j = self._replay.get_random()
                 y_j = j.r
+                self._configure_players(j)
                 if not j.is_terminal():
                     j.s.update(j.a)
                     # ToDo Need to fix how board state measured since player changed after this move
@@ -318,12 +329,28 @@ class DeepQAgent(Agent, nn.Module):
                 optim.zero_grad()
                 loss.backward()
                 optim.step()
+
                 # Advance to next state
+                self._configure_players(t)
                 if t.s.is_game_over(): break
-                if t.a not in t.s.next_player.move_set: t.s.update(t.a)
+                if t.a in t.s.next_player.move_set: t.s.update(t.a)
             utils.save_module(self, EXPORT_DIR / "episode_%04d.pth" % episode)
             logging.info("COMPLETED episode %d of %d", episode, self._M)
-        utils.save_module(self, EXPORT_DIR / "final_rl.pth")
+        utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
+        Move.DISABLE_ASSERT_CHECKS = False
+
+    def _configure_players(self, t: ReplayStateTuple) -> None:
+        r"""
+        Swaps the references for \p _plyr and \p _other based on the \p State variable in state
+        tuple \p t.
+
+        :param t: State tuple for training the network
+        """
+        if t.s.next_player == self._plyr:
+            return
+        temp = self._plyr
+        self._plyr = self._other
+        self._other = temp
 
     def _num_scout_moves(self) -> int:
         r"""
@@ -333,7 +360,8 @@ class DeepQAgent(Agent, nn.Module):
         """
         return (self._brd.num_cols - 1) + (self._brd.num_rows - 1)
 
-    def _get_state_move(self, s: ReplayStateTuple) -> Tuple[int, Move]:
+    # def _get_state_move(self, s: ReplayStateTuple) -> Tuple[int, Move]:
+    def _get_state_move(self, s: ReplayStateTuple) -> Move:
         r"""
         Gets the move corresponding to the specified state
 
@@ -342,10 +370,11 @@ class DeepQAgent(Agent, nn.Module):
         """
         x = DeepQAgent._build_input_tensor(s.base_tensor, s.s.pieces(), s.s.next_player)
         policy = self.forward(x)
-        output_node = int(torch.argmax(policy)[0])
+        output_node = int(torch.argmax(policy))
         move = self._convert_output_node_to_move(output_node, s.s.next_player,
                                                  s.s.get_other_player(s.s.next_player))
-        return output_node, move
+        # return output_node, move
+        return move
 
     def _get_move_from_output_node(self, output_node: Union[torch.Tensor, int]) -> Move:
         r"""

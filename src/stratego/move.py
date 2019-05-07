@@ -8,6 +8,7 @@ from .piece import Piece, Rank
 
 class Move:
     _brd = None
+    DISABLE_ASSERT_CHECKS = False
 
     @staticmethod
     def set_board(brd: Board) -> None:
@@ -27,7 +28,8 @@ class Move:
         self._orig, self._new = orig, new
 
         # In some debug or training cases, p may be None, don't crash
-        if p is None: return
+        if p is None or Move.DISABLE_ASSERT_CHECKS:
+            return
 
         if not Move._is_valid_loc(orig) or not Move._is_valid_loc(new):
             raise ValueError("Location not valid with board")

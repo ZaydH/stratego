@@ -43,11 +43,15 @@ def _main_hard_coded():
 
 def _main_random():
     game = Game("boards/small.txt", "states/test_debug.txt", visibility=Printer.Visibility.ALL)
-    # a1, a2 = RandomAgent(game.red), RandomAgent(game.blue)
+    a1, a2 = RandomAgent(game.red), RandomAgent(game.blue)
     # a2 = RandomAgent(game.blue)
     # a1 = HumanAgent(game.red)
-    # game.two_agent_automated(a1, a2, display=True, wait_time=1)
-    a1 = DeepQAgent(game.board, game.red, game.blue)
+    game.two_agent_automated(a1, a2, display=True, wait_time=1)
+
+
+def _main_deep_q_vs_human():
+    game = Game("boards/small.txt", "states/test_debug.txt", visibility=Printer.Visibility.ALL)
+    a1 = HumanAgent(game.red)
     a2 = DeepQAgent(game.board, game.blue, game.red)
     game.two_agent_automated(a1, a2, display=True, moves_output_file="moves.txt")
 
@@ -59,10 +63,17 @@ def _main_make_moves(moves_file: PathOrStr, display_after_move: bool = False):
     game.display_current()
 
 
+def _main_train():
+    game = Game("boards/small.txt", "states/test_debug.txt", visibility=Printer.Visibility.ALL)
+    agent = DeepQAgent(game.board, game.red, game.blue)
+    agent.train_network(game.state)
+
+
 def _main():
     # _main_hard_coded()
-    _main_random()
+    # _main_random()
     # _main_make_moves("moves.txt")
+    _main_train()
 
 
 if __name__ == "__main__":

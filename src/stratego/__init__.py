@@ -57,6 +57,11 @@ class Game:
         r""" Accessor to the board used for the game """
         return self._brd
 
+    @property
+    def state(self) -> State:
+        r""" Accessor to the \p State of the game """
+        return self._state
+
     def move(self, cur_loc: Tuple[int, int], new_loc: Tuple[int, int]) -> bool:
         r"""
         Move the piece at \p cur_loc to \p new_loc
