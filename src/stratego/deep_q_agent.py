@@ -190,10 +190,10 @@ class ReplayMemory:
         s = copy.deepcopy(s)
         if len(self._buf) < self._N:
             self._buf.append(s)
-        else:
-            self._buf[self._N] = s
-            self._next += 1
-            if self._next == self._N: self._next = 0
+            return
+        self._buf[self._next] = s
+        self._next += 1
+        if self._next == self._N: self._next = 0
 
     def get_random(self) -> ReplayStateTuple:
         r""" Select a random element from the replay memory """

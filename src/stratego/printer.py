@@ -100,12 +100,12 @@ class Printer:
         assert not self._is_loc_empty(loc), "Tried to delete piece that does not exist"
         self._set_piece(loc, Printer.EMPTY_LOCATION)
 
-    def move_piece(self, orig: Location, new: Location) -> None:
-        r""" Move piece from \p orig to \p new """
-        assert not self._is_loc_empty(orig), "Trying to move an empty location"
-        piece_str = self._get_piece(orig)
-        self._set_piece(new, piece_str)
-        self.delete_piece(orig)
+    # def move_piece(self, orig: Location, new: Location) -> None:
+    #     r""" Move piece from \p orig to \p new """
+    #     assert not self._is_loc_empty(orig), "Trying to move an empty location"
+    #     piece_str = self._get_piece(orig)
+    #     self._set_piece(new, piece_str)
+    #     self.delete_piece(orig)
 
     def add_piece(self, piece: Piece) -> None:
         r""" Add the specified piece to the printer """
