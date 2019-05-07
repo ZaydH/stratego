@@ -52,6 +52,11 @@ class Game:
         r""" Accessor for the BLUE player """
         return self._state.blue
 
+    @property
+    def board(self) -> Board:
+        r""" Accessor to the board used for the game """
+        return self._brd
+
     def move(self, cur_loc: Tuple[int, int], new_loc: Tuple[int, int]) -> bool:
         r"""
         Move the piece at \p cur_loc to \p new_loc
@@ -180,7 +185,8 @@ class Game:
             res = re.findall(r"\d+", line)
             locs = [(int(res[i]), int(res[i+1])) for i in range(0, 3, 2)]
             self.move(*locs)
-            if display_after_move: self.display_current()
+            if display_after_move:
+                self.display_current()
 
     def display_current(self):
         r""" Displays the current state of the game to the console """

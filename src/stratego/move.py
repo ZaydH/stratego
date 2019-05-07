@@ -22,16 +22,20 @@ class Move:
         :param attacked: Piece that is being attacked in the move (if any)
         """
         assert orig is not None
-        if not Move._is_valid_loc(orig) or not Move._is_valid_loc(new):
-            raise ValueError("Location not valid with board")
-        # ZSH - This check should be correct but may need to be revisited
-        assert p.loc == orig, "Location of piece to moved does not match original location"
-
-        if not Move._is_valid_piece(p):
-            raise ValueError("Invalid piece to be moved")
 
         self._piece, self._attacked = p, attacked
         self._orig, self._new = orig, new
+
+        # In some debug or training cases, p may be None, don't crash
+        if p is None: return
+
+        if not Move._is_valid_loc(orig) or not Move._is_valid_loc(new):
+            raise ValueError("Location not valid with board")
+        # ZSH - This check should be correct but may need to be revisited
+        assert p.loc == orig, "Piece location does not match original location"
+
+        if not Move._is_valid_piece(p):
+            raise ValueError("Invalid piece to be moved")
 
         # ZSH - This check should be correct but may need to be revisited
         assert (not self.is_attack()) or attacked.loc == new, "Location of attacked mismatch"
@@ -115,6 +119,10 @@ class Move:
             logging.warning("Trying to move an immobile piece")
             return False
         return True
+
+    # def __eq__(self, other: 'Move') -> bool:
+    #     return (isinstance(other, Move) and self.piece == other.piece and self.orig == other.orig
+    #             and self.new == other.new and self.attacked == other.attacked)
 
 
 class MoveStack:

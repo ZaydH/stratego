@@ -1,6 +1,9 @@
 from stratego import Game
+from stratego.deep_q_agent import DeepQAgent
+# noinspection PyUnresolvedReferences
 from stratego.human_agent import HumanAgent
 from stratego.printer import Printer
+# noinspection PyUnresolvedReferences
 from stratego.random_agent import RandomAgent
 from stratego.utils import setup_logger, PathOrStr
 
@@ -41,9 +44,11 @@ def _main_hard_coded():
 def _main_random():
     game = Game("boards/small.txt", "states/test_debug.txt", visibility=Printer.Visibility.ALL)
     # a1, a2 = RandomAgent(game.red), RandomAgent(game.blue)
-    a2 = RandomAgent(game.blue)
-    a1 = HumanAgent(game.red)
+    # a2 = RandomAgent(game.blue)
+    # a1 = HumanAgent(game.red)
     # game.two_agent_automated(a1, a2, display=True, wait_time=1)
+    a1 = DeepQAgent(game.board, game.red, game.blue)
+    a2 = DeepQAgent(game.board, game.blue, game.red)
     game.two_agent_automated(a1, a2, display=True, moves_output_file="moves.txt")
 
 

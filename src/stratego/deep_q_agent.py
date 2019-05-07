@@ -25,7 +25,8 @@ import torch.nn as nn
 import torch.optim
 from tqdm import tqdm
 
-from . import Location, Move
+from stratego.utils import EXPORT_DIR
+from . import Location, Move, utils
 from .agent import Agent
 from .board import Board
 from .piece import Color, Piece, Rank
@@ -35,7 +36,7 @@ from .state import State
 # noinspection PyUnresolvedReferences
 IS_CUDA = torch.cuda.is_available()
 # noinspection PyUnresolvedReferences
-TensorDType = torch.int8
+TensorDType = torch.float32
 ActCls = nn.ReLU
 
 
@@ -292,9 +293,11 @@ class DeepQAgent(Agent, nn.Module):
                 if t.s.is_game_over():
                     t.r = self._LOSS_REWARD
                 # Treat illegal moves as an instant loss
-                elif t.s.next_player.is_valid_next(t.a): t.r = self._LOSS_REWARD
+                elif not t.s.next_player.is_valid_next(t.a):
+                    t.r = self._LOSS_REWARD
                 # Player about to win
-                elif t.a.is_attack() and t.a.attacked.rank == Rank.flag(): t.r = self._WIN_REWARD
+                elif t.a.is_attack() and t.a.attacked.rank == Rank.flag():
+                    t.r = self._WIN_REWARD
                 # Game not over yet
                 else: t.r = 0
                 self._replay.add(t)
@@ -306,7 +309,7 @@ class DeepQAgent(Agent, nn.Module):
                     # ToDo Need to fix how board state measured since player changed after this move
                     x_j = DeepQAgent._build_input_tensor(t.base_tensor, t.s.pieces(),
                                                          t.s.next_player)
-                    y_j += self._gamma * torch.max(self.forward(x_j))
+                    y_j -= self._gamma * torch.max(self.forward(x_j))
                     # ToDo may need to rollback multiple moves
                     j.s.rollback()
 
@@ -318,7 +321,9 @@ class DeepQAgent(Agent, nn.Module):
                 # Advance to next state
                 if t.s.is_game_over(): break
                 if t.a not in t.s.next_player.move_set: t.s.update(t.a)
+            utils.save_module(self, EXPORT_DIR / "episode_%04d.pth" % episode)
             logging.info("COMPLETED episode %d of %d", episode, self._M)
+        utils.save_module(self, EXPORT_DIR / "final_rl.pth")
 
     def _num_scout_moves(self) -> int:
         r"""
@@ -337,7 +342,7 @@ class DeepQAgent(Agent, nn.Module):
         """
         x = DeepQAgent._build_input_tensor(s.base_tensor, s.s.pieces(), s.s.next_player)
         policy = self.forward(x)
-        output_node = torch.argmax(policy)
+        output_node = int(torch.argmax(policy)[0])
         move = self._convert_output_node_to_move(output_node, s.s.next_player,
                                                  s.s.get_other_player(s.s.next_player))
         return output_node, move
@@ -458,17 +463,20 @@ class DeepQAgent(Agent, nn.Module):
         # Gradients no needed since will not be push backwards
         # noinspection PyUnresolvedReferences
         with torch.no_grad():
-            policy, _ = self.forward(x)
+            policy = self.forward(x)
         while True:
             out_node = torch.argmax(policy, dim=1)
-            m = self._get_move_from_output_node(out_node)
-            # As a safety always ensure selected move is valid
-            if m in self._plyr.move_set:
-                return m
-            logging.warning("Tried to select move %s to %s for color %s but move is invalid",
-                            m.orig, m.new, m.piece.color.name)
+            try:
+                m = self._get_move_from_output_node(out_node)
+                # As a safety always ensure selected move is valid
+                if m in self._plyr.move_set:
+                    return m
+                logging.warning("Tried to select move %s to %s for color %s but move is invalid",
+                                m.orig, m.new, self.color)
+            except (ValueError, AssertionError):
+                logging.warning("Runtime exception with out_node: %d" % out_node)
             # Zero out that move and select a different one
-            policy[:, out_node] = torch.zeros((policy.size(0)), dtype=TensorDType)
+            policy[:, out_node] = -torch.ones((policy.size(0)), dtype=TensorDType)
 
     # def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     #     r"""
@@ -490,7 +498,7 @@ class DeepQAgent(Agent, nn.Module):
         :return: Tuple of the ten
         """
         # noinspection PyUnresolvedReferences
-        assert x.shape[1:] == [self.d_in, self._brd.num_rows, self._brd.num_cols]
+        assert x.shape[1:] == torch.Size([self.d_in, self._brd.num_rows, self._brd.num_cols])
         y = self._q_net(x)
         return self._head_policy(y)
 

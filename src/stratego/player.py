@@ -139,6 +139,11 @@ class MoveSet:
         r""" Return number of moves in the \p MoveSet """
         return len(self._avail)
 
+    def __contains__(self, item: Move) -> bool:
+        r""" Adds support for the "in" operator """
+        if item.piece is None: return False
+        return self.has_move(item.piece, item.new)
+
     def remove_moves_after_add(self, loc: Location, plyr_locs: dict, other_locs: dict) -> None:
         r"""
         Process the adding of a piece at Location \p loc
