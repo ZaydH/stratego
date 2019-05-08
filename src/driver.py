@@ -37,8 +37,6 @@ def _main_hard_coded():
 
     game = Game("boards/small.txt", "states/small_debug.txt", visibility=Printer.Visibility.ALL)
     game.display_current()
-    # noinspection PyProtectedMember
-    game._execute_move_file("moves/driver_debug_moves.txt", display_after_move=True)
 
 
 def _main_random():
@@ -73,6 +71,7 @@ def _main():
     # _main_hard_coded()
     # _main_random()
     # _main_make_moves("moves.txt")
+    # _main_deep_q_vs_human()
     _main_train()
 
 
