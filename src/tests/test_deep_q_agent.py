@@ -27,9 +27,10 @@ def _make_deep_q_agent(brd: Board = STD_BRD,
                        state_file: PathOrStr = STATES_PATH / "state_move_verify.txt") -> DeepQAgent:
     r""" Helper function used to create a generic Deep Q agent. """
     state = State.importer(state_file, brd)
-    return DeepQAgent(brd, state.red, state.blue)
+    return DeepQAgent(brd, state.red, state.blue, disable_import=True)
 
 
+# noinspection PyProtectedMember
 def test_deep_q_constructor():
     r""" Basic constructor related tests """
     agent = _make_deep_q_agent()
@@ -43,6 +44,7 @@ def test_deep_q_constructor():
     assert agent.d_out == num_rows * num_cols * num_scout_move
 
 
+# noinspection PyProtectedMember
 # pylint: disable=protected-access
 def test_output_node_to_locs():
     r"""
@@ -77,6 +79,7 @@ def test_output_node_to_locs():
         assert agent._get_output_node_from_move(m) == i
 
 
+# noinspection PyProtectedMember
 def test_rank_lookup():
     r""" Simple checks that the rank lookup is reasonable """
     num_rank = len(Rank.get_all())
@@ -104,12 +107,12 @@ def test_rank_lookup():
     assert max(other_layers) - min(other_layers) == len(other_layers) - 1
 
 
-# noinspection PyTypeChecker,PyUnresolvedReferences
+# noinspection PyTypeChecker,PyUnresolvedReferences,PyProtectedMember
 def test_input_builder():
     r""" Verify that the input builder script works as expected """
     agent = _make_deep_q_agent()
 
-    t_in = agent._build_network_input()
+    t_in = agent._build_network_input(agent._plyr, agent._other)
     # verify the dimensions
     assert len(t_in.shape) == 4
     # Only a single batch

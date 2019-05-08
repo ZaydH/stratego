@@ -234,7 +234,8 @@ class DeepQAgent(Agent, nn.Module):
 
     _EXPORTED_MODEL = EXPORT_DIR / "final_deep_q.pth"
 
-    def __init__(self, brd: Board, plyr: Player, other: Player, eps_end: float = 1e-4):
+    def __init__(self, brd: Board, plyr: Player, other: Player, eps_end: float = 1e-4,
+                 disable_import: bool = False):
         r"""
         :param brd: Game board
         :param plyr: Player who will be controlled by the agent.
@@ -265,7 +266,7 @@ class DeepQAgent(Agent, nn.Module):
 
         self._construct_network()
         self._replay = None
-        if DeepQAgent._EXPORTED_MODEL.exists():
+        if not disable_import and DeepQAgent._EXPORTED_MODEL.exists():
             msg = "Importing saved model: \"%s\"" % str(DeepQAgent._EXPORTED_MODEL)
             logging.debug("Starting: %s" % msg)
             utils.load_module(self, DeepQAgent._EXPORTED_MODEL)
@@ -298,7 +299,7 @@ class DeepQAgent(Agent, nn.Module):
             for _ in progress_bar:
                 self._configure_players(t)
                 # With probability < \epsilon, select a random action
-                if random.random() < self._eps: t.a = self._plyr.get_random_move()
+                if random.random() < self._eps: t.a = t.s.next_player.get_random_move()
                 # Select (epsilon-)greedy action
                 else: t.a = self._get_state_move(t)
 
@@ -322,8 +323,8 @@ class DeepQAgent(Agent, nn.Module):
                 if not j.is_terminal():
                     j.s.update(j.a)
                     # ToDo Need to fix how board state measured since player changed after this move
-                    x_j = DeepQAgent._build_input_tensor(t.base_tensor, t.s.pieces(),
-                                                         t.s.next_player)
+                    x_j = DeepQAgent._build_input_tensor(j.base_tensor, j.s.pieces(),
+                                                         j.s.next_player)
                     y_j_1_val, _ = torch.max(self.forward(x_j), dim=1, keepdim=True)
                     y_j = y_j - self._gamma * y_j_1_val
                     # ToDo may need to rollback multiple moves
@@ -336,23 +337,12 @@ class DeepQAgent(Agent, nn.Module):
                 optim.step()
 
                 # Advance to next state
-                self._configure_players(t)
                 if t.s.is_game_over(): break
                 if t.a in t.s.next_player.move_set: t.s.update(t.a)
             utils.save_module(self, EXPORT_DIR / ("episode_%04d.pth" % episode))
             logging.info("COMPLETED episode %d of %d", episode, self._M)
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
-
-    def _configure_players(self, t: ReplayStateTuple) -> None:
-        r"""
-        Swaps the references for \p _plyr and \p _other based on the \p State variable in state
-        tuple \p t.
-
-        :param t: State tuple for training the network
-        """
-        self._plyr = t.s.next_player
-        self._other = t.s.get_other_player(t.s.next_player)
 
     def _num_scout_moves(self) -> int:
         r"""
@@ -387,15 +377,16 @@ class DeepQAgent(Agent, nn.Module):
         """
         return self._convert_output_node_to_move(output_node, plyr, other)
 
-    def _get_action_output_score(self, j: ReplayStateTuple) -> torch.Tensor:
+    def _get_action_output_score(self, state_tuple: ReplayStateTuple) -> torch.Tensor:
         r"""
         Used in training the agent.  Returns the output score for action :math:`a_j` in :math:`s_j`
 
-        :param j: State at step :math:`j`
+        :param state_tuple: State at step :math:`j`
         :return:
         """
-        output_node = self._get_output_node_from_move(j.a)
-        x = self._build_input_tensor(j.base_tensor, j.s.pieces(), j.s.next_player)
+        output_node = self._get_output_node_from_move(state_tuple.a)
+        x = self._build_input_tensor(state_tuple.base_tensor, state_tuple.s.pieces(),
+                                     state_tuple.s.next_player)
         y = self.forward(x)
         return y[:, output_node:output_node + 1]
 
@@ -491,8 +482,7 @@ class DeepQAgent(Agent, nn.Module):
         Select the next move to be played.
         :return: Move to be performed
         """
-        pieces = itertools.chain(self._plyr.pieces(), self._other.pieces())
-        x = self._build_input_tensor(self._base_in, pieces, self._plyr)
+        x = self._build_network_input(self._plyr, self._other)
         # Gradients no needed since will not be push backwards
         # noinspection PyUnresolvedReferences
         with torch.no_grad():
@@ -535,17 +525,17 @@ class DeepQAgent(Agent, nn.Module):
         y = self._q_net(x)
         return self._head_policy(y)
 
-    # def _build_network_input(self) -> torch.Tensor:
-    #     r"""
-    #     Constructs the tensor to input into the Q-network.
-    #
-    #     :return: Tensor to put into the network
-    #     """
-    #     pieces = itertools.chain(self._plyr.pieces(), self._other.pieces())
-    #     return self._build_input_tensor(self._base_in, pieces, self._plyr)
+    def _build_network_input(self, plyr: Player, other: Player) -> torch.Tensor:
+        r"""
+        Constructs the tensor to input into the Q-network.
+
+        :return: Tensor to put into the network
+        """
+        pieces = itertools.chain(plyr.pieces(), other.pieces())
+        return self._build_input_tensor(self._base_in, pieces, plyr)
 
     @staticmethod
-    def _build_base_tensor(brd: Board, d_in) -> TensorDType:
+    def _build_base_tensor(brd: Board, d_in: int) -> TensorDType:
         r"""
         Constructs a base tensor for a board
 
