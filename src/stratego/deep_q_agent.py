@@ -214,7 +214,7 @@ class DeepQAgent(Agent, nn.Module):
 
     # Training parameters
     _M = 100000
-    _T = 400  # Maximum number of moves for a state
+    _T = 4000  # Maximum number of moves for a state
     _EPS_START = 0.25
     _gamma = 0.98
     _lr = 1e-4
@@ -304,16 +304,19 @@ class DeepQAgent(Agent, nn.Module):
             progress_bar = tqdm(range(self._T), total=self._T, file=sys.stdout)
             for _ in progress_bar:
                 # With probability < \epsilon, select a random action
-                if random.random() < self._eps:
-                    t.a = t.s.next_player.get_random_move()
-                # Select (epsilon-)greedy action
-                else:
-                    _, policy, t.a = self._get_state_move(t)
-                    # Treat illegal moves as an instant loss
-                    if not t.s.next_player.is_valid_next(t.a):
-                        t.r = self._INVALID_MOVE_REWARD
-                        self._punish_invalid_move(policy, optim)
-                        continue
+                if not t.s.next_player.move_set.is_empty():
+                    if random.random() < self._eps:
+                        t.a = t.s.next_player.get_random_move()
+                    # Select (epsilon-)greedy action
+                    else:
+                        _, policy, t.a = self._get_state_move(t)
+                        # Treat illegal moves as an instant loss
+                        if not t.s.next_player.is_valid_next(t.a):
+                            t.r = self._INVALID_MOVE_REWARD
+                            self._punish_invalid_move(policy, optim)
+                            continue
+                    f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
+                    f_out.flush()
 
                 # Handle case player already lost
                 if t.s.is_game_over():
@@ -325,17 +328,18 @@ class DeepQAgent(Agent, nn.Module):
                 else:
                     t.r = torch.zeros_like(self._WIN_REWARD)
                 self._replay.add(t)
-                f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
-                f_out.flush()
 
                 j = self._replay.get_random()
                 y_j = j.r
                 if not j.is_terminal():
                     j.s.update(j.a)
-                    # ToDo Need to fix how board state measured since player changed after this move
-                    _, y_j_1_val, _ = self._get_state_move(j)
-                    y_j = y_j - self._gamma * y_j_1_val
-                    # ToDo may need to rollback multiple moves
+                    if j.s.next_player.move_set.is_empty():
+                        y_j = -DeepQAgent._LOSS_REWARD
+                    else:
+                        # ToDo Need to fix how board state measured since player changed after move
+                        _, y_j_1_val, _ = self._get_state_move(j)
+                        y_j = y_j - self._gamma * y_j_1_val
+                        # ToDo may need to rollback multiple moves
                     j.s.rollback()
 
                 q_j = self._get_action_output_score(j)
@@ -345,8 +349,10 @@ class DeepQAgent(Agent, nn.Module):
                 optim.step()
 
                 # Advance to next state
-                if t.s.is_game_over(): break
-                if t.a in t.s.next_player.move_set: t.s.update(t.a)
+                if t.s.is_game_over():
+                    progress_bar.close()
+                    break
+                t.s.update(t.a)
             f_out.close()
             utils.save_module(self, EXPORT_DIR / ("episode_%04d.pth" % episode))
             logging.info("COMPLETED episode %d of %d", episode, self._M)
