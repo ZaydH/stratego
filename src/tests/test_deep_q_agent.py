@@ -12,6 +12,7 @@ import pytest
 
 import torch
 
+import stratego.deep_q_agent
 from stratego.board import Board
 from stratego.deep_q_agent import DeepQAgent
 from stratego.location import Location
@@ -21,6 +22,17 @@ from stratego.state import State
 from stratego.utils import PathOrStr
 
 from testing_utils import NO_BLOCK_BRD, STATES_PATH, STD_BRD
+
+
+@pytest.fixture(scope="module")
+def switch_to_int_tensor():
+    orig_dtype = stratego.deep_q_agent.TensorDType
+    stratego.deep_q_agent.TensorDType = torch.int32
+    # Code that will run before your test, for example:
+    # A test function will be run at this point
+    yield
+    # Code that will run after test
+    stratego.deep_q_agent.TensorDType = orig_dtype
 
 
 def _make_deep_q_agent(brd: Board = STD_BRD,
@@ -99,12 +111,33 @@ def test_rank_lookup():
     assert all(isinstance(v, int) for v in vals)
 
     # Ensure no duplicates for the (non-rank) layers
-    other_layers = [DeepQAgent._unk_rank_layer, DeepQAgent._impass_layer,
-                    DeepQAgent._next_turn_layer]
+    other_layers = [DeepQAgent._unk_rank_layer, DeepQAgent._impass_layer]
     assert len(other_layers) == len(set(other_layers))
     # Ensure other layers start right after the rank layers
-    assert min(other_layers) == num_rank
+    assert min(other_layers) == 2 * num_rank
     assert max(other_layers) - min(other_layers) == len(other_layers) - 1
+
+
+# noinspection PyTypeChecker,PyUnresolvedReferences,PyProtectedMember
+@pytest.mark.usefixtures("switch_to_int_tensor")
+def test_base_input_builder():
+    r""" Verifies that the base input builder has expected contents """
+    agent = _make_deep_q_agent()
+
+    base_in = agent._build_base_tensor(agent._brd, agent._d_in)
+    # Verify anything but the impass is empty
+    base_no_impass = base_in[:, :DeepQAgent._impass_layer]
+    sum_impass = base_no_impass.sum()
+    assert int(sum_impass) == 0, "Anything not impass should be blank"
+
+    # Check the impass layer is correct
+    base_no_impass = base_in.narrow(dim=1, start=DeepQAgent._impass_layer, length=1)
+    assert int(base_no_impass.sum()) == len(agent._brd.blocked), "Any loc not impass must be blank"
+
+    # Verify that hte impassable values are in the base tensor
+    val = DeepQAgent._IMPASSABLE_VAL
+    for loc in agent._brd.blocked:
+        assert base_in[0, DeepQAgent._impass_layer, loc.r, loc.c] == val, "Location not blocked"
 
 
 # noinspection PyTypeChecker,PyUnresolvedReferences,PyProtectedMember
@@ -112,31 +145,33 @@ def test_input_builder():
     r""" Verify that the input builder script works as expected """
     agent = _make_deep_q_agent()
 
-    t_in = agent._build_network_input(agent._plyr, agent._other)
-    # verify the dimensions
-    assert len(t_in.shape) == 4
-    # Only a single batch
-    assert t_in.size(0) == 1
-    assert t_in.size(1) == agent.d_in
-    assert t_in.size(2) == agent._brd.num_rows
-    assert t_in.size(3) == agent._brd.num_cols
+    for plyr, other in [(agent._plyr, agent._other), (agent._other, agent._plyr)]:
+        t_in = agent._build_network_input(plyr, other)
+        # verify the dimensions
+        assert len(t_in.shape) == 4
+        # Only a single batch
+        assert t_in.size(0) == 1
+        assert t_in.size(1) == agent.d_in
+        assert t_in.size(2) == agent._brd.num_rows
+        assert t_in.size(3) == agent._brd.num_cols
 
-    # noinspection PyUnresolvedReferences
-    def _get_in_layer(layer_num: int) -> torch.Tensor:
-        return t_in[0, layer_num].view(-1)
+        # noinspection PyUnresolvedReferences
+        def _get_in_layer(layer_num: int) -> torch.Tensor:
+            return t_in[0, layer_num].view(-1)
 
-    num_plyr_piece = len(list(agent._plyr.pieces()))
-    num_other_piece = len(list(agent._other.pieces()))
-    _color_layers = t_in[0, 0:len(Rank.get_all())].view([-1])
-    # Assert the number of pieces is correct
-    assert DeepQAgent._RED_PIECE_VAL != DeepQAgent._BLUE_PIECE_VAL, "Sanity check"
-    num_red = sum(_color_layers == DeepQAgent._RED_PIECE_VAL)
-    assert num_red == num_plyr_piece
-    num_blue = sum(_color_layers == DeepQAgent._BLUE_PIECE_VAL)
-    assert num_blue == num_other_piece
+        assert plyr.color != other.color
+        # assert DeepQAgent._RED_PIECE_VAL != DeepQAgent._BLUE_PIECE_VAL, "Sanity check"
 
-    # Ensure no pieces are unknown (may need to change later)
-    assert torch.sum(_get_in_layer(DeepQAgent._unk_rank_layer)) == 0
+        # assert the number of pieces is correct
+        num_r = len(Rank.get_all())
+        for _p in [plyr, other]:
+            ofs = 0 if _p == plyr else 1
+            num_pieces = len(list(_p.pieces()))
+            found_cnt = [t_in[0, i] == DeepQAgent._PIECE_VAL for i in range(ofs, 2 * num_r, 2)]
+            assert sum([x.sum() for x in found_cnt]) == num_pieces
 
-    # Blocked piece location
-    assert torch.sum(_get_in_layer(DeepQAgent._impass_layer)) == len(agent._brd.blocked)
+        # Ensure no pieces are unknown (may need to change later)
+        assert torch.sum(_get_in_layer(DeepQAgent._unk_rank_layer)) == 0
+
+        # Blocked piece location
+        assert torch.sum(_get_in_layer(DeepQAgent._impass_layer)) == len(agent._brd.blocked)

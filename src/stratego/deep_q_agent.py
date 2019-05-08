@@ -326,6 +326,7 @@ class DeepQAgent(Agent, nn.Module):
                     t.r = torch.zeros_like(self._WIN_REWARD)
                 self._replay.add(t)
                 f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
+                f_out.flush()
 
                 j = self._replay.get_random()
                 y_j = j.r
