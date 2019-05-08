@@ -311,7 +311,7 @@ class State:
         # Last move attacked flag
         if not self._stack.is_empty() and self._stack.top().is_game_over(): return True
         # Current player has no moves
-        if len(self.next_player.move_set) == 0: return True
+        if self.next_player.move_set.is_empty(): return True
         return False
 
     def write_board(self) -> str:

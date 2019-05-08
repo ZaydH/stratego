@@ -215,6 +215,10 @@ class MoveSet:
     def _make_move_key(orig: Location, new: Location):
         return orig, new
 
+    def is_empty(self) -> bool:
+        r""" Returns \p True if the \p MoveSet is empty """
+        return not bool(self.avail)
+
 
 class Player:
     r""" Represents one of the two players """
