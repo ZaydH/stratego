@@ -148,6 +148,7 @@ class Game:
             if w_move:
                 # noinspection PyUnboundLocalVariable
                 f_out.write("\n%s,%s,%s" % (cur.color.name, m.orig, m.new))
+                f_out.flush()
             self.play_move(m, display)
 
             if wait_time > 0: time.sleep(wait_time)

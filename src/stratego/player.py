@@ -198,7 +198,8 @@ class MoveSet:
             if not add: self._del_move(p, loc)
             # In an add, always add the move.  In a delete, may need to add back if the moved
             # piece is of the other player's color
-            if add or loc in other_locs: _add_func(p, loc)
+            if add or loc in other_locs:
+                _add_func(p, loc)
 
             if p.is_scout():
                 for srch in opp:

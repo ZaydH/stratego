@@ -13,7 +13,7 @@ r"""
 from typing import Tuple
 import pytest
 
-from stratego import Move, Game, Printer
+from stratego import Move
 from stratego.location import Location
 from stratego.move import MoveStack
 from stratego.piece import Color
@@ -177,6 +177,28 @@ def test_single_adjacent_scout():
     _helper_small_test(move_list, state_file="moveset_two_scouts_adjacent.txt")
 
 
+def test_scout_blocking_scout():
+    r""" Test making a single move with a scout then a direct attack """
+    move_list = [(None, None, None, None, 7, 7, 11, 11),
+                 (Color.RED, Color.BLUE, (0, 5), (1, 5), 7, 7, 14, 11),
+                 (Color.BLUE, Color.RED, (7, 3), (2, 3), 7, 7, 14, 19),
+                 (Color.RED, Color.BLUE, (1, 5), (1, 4), 7, 7, 13, 19),
+                 (Color.BLUE, Color.RED, (2, 3), (3, 3), 7, 7, 13, 13),
+                 (Color.RED, Color.BLUE, (1, 4), (2, 4), 7, 7, 14, 13),
+                 (Color.BLUE, Color.RED, (7, 2), (7, 3), 7, 7, 14, 13),
+                 (Color.RED, Color.BLUE, (0, 0), (1, 0), 7, 7, 17, 13),
+                 (Color.BLUE, Color.RED, (3, 3), (2, 3), 7, 7, 17, 16),
+                 (Color.RED, Color.BLUE, (2, 4), (3, 4), 7, 7, 16, 19),
+                 (Color.BLUE, Color.RED, (2, 3), (2, 4), 7, 7, 16, 16),
+                 (Color.RED, Color.BLUE, (1, 0), (2, 0), 7, 7, 16, 16),
+                 (Color.BLUE, Color.RED, (2, 4), (2, 1), 7, 7, 11, 19),
+                 (Color.RED, Color.BLUE, (0, 2), (1, 2), 7, 7, 16, 19),
+                 (Color.BLUE, Color.RED, (7, 5), (6, 5), 7, 7, 16, 22),
+                 (Color.RED, Color.BLUE, (2, 0), (2, 1), 7, 6, 16, 9)
+                 ]
+    _helper_small_test(move_list, state_file="moveset_scout_block_scout.txt")
+
+
 # noinspection PyProtectedMember
 def _helper_small_test(move_info, state_file: str = "moveset_small_direct_attack.txt"):
     r"""
@@ -200,7 +222,7 @@ def _helper_small_test(move_info, state_file: str = "moveset_small_direct_attack
         m = _get_move_from_player(plyr, l1, l2)
         moves.append(m)
         state.update(moves[-1])
-        brd.append([state.write_board()])
+        brd.append(state.write_board())
         _verify_num_pieces_and_move_set_size(state, num_red_p, num_blue_p,
                                              num_red_mv, num_blue_mv)
 
@@ -212,6 +234,8 @@ def _helper_small_test(move_info, state_file: str = "moveset_small_direct_attack
         _verify_num_pieces_and_move_set_size(state, num_red_p, num_blue_p,
                                              num_red_mv, num_blue_mv)
         assert moves[-i] == state._stack.top()  # pylint: disable=protected-access
+
+        state.rollback()
 
         _, _, _, _, num_red_p, num_blue_p, num_red_mv, num_blue_mv = move_info[-i - 1]
         _verify_num_pieces_and_move_set_size(state, num_red_p, num_blue_p,

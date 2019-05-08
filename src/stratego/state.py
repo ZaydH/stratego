@@ -289,7 +289,8 @@ class State:
         # May need to delete the attacked piece's info
         self._printer.delete_piece(move.new)
         other.delete_piece_info(move.attacked, self.next_player)
-        other.delete_moveset_info(move.new, self.get_other_player(other))
+        # other.delete_moveset_info(move.new, self.next_player)
+        self._delete_moveset_info(move.new)
 
     def _do_piece_movement(self, move: Move):
         r"""
