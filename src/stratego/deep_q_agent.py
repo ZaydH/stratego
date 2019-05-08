@@ -266,7 +266,10 @@ class DeepQAgent(Agent, nn.Module):
         self._construct_network()
         self._replay = None
         if DeepQAgent._EXPORTED_MODEL.exists():
+            msg = "Importing saved model: \"%s\"" % str(DeepQAgent._EXPORTED_MODEL)
+            logging.debug("Starting: %s" % msg)
             utils.load_module(self, DeepQAgent._EXPORTED_MODEL)
+            logging.debug("COMPLETED: %s" % msg)
         # Must be last in constructor to ensure proper CUDA enabling
         if IS_CUDA: self.cuda()
 
@@ -375,13 +378,14 @@ class DeepQAgent(Agent, nn.Module):
         # return output_node, move
         return move
 
-    def _get_move_from_output_node(self, output_node: Union[torch.Tensor, int]) -> Move:
+    def _get_move_from_output_node(self, output_node: Union[torch.Tensor, int],
+                                   plyr: Player, other: Player) -> Move:
         r"""
         Gets the move for the current player based on the node with the highest value
 
         :param output_node: Index of the output node
         """
-        return self._convert_output_node_to_move(output_node, self._plyr, self._other)
+        return self._convert_output_node_to_move(output_node, plyr, other)
 
     def _get_action_output_score(self, j: ReplayStateTuple) -> torch.Tensor:
         r"""
@@ -487,7 +491,8 @@ class DeepQAgent(Agent, nn.Module):
         Select the next move to be played.
         :return: Move to be performed
         """
-        x = self._build_network_input()
+        pieces = itertools.chain(self._plyr.pieces(), self._other.pieces())
+        x = self._build_input_tensor(self._base_in, pieces, self._plyr)
         # Gradients no needed since will not be push backwards
         # noinspection PyUnresolvedReferences
         with torch.no_grad():
@@ -495,7 +500,7 @@ class DeepQAgent(Agent, nn.Module):
         while True:
             out_node = torch.argmax(policy, dim=1)
             try:
-                m = self._get_move_from_output_node(out_node)
+                m = self._get_move_from_output_node(out_node, self._plyr, self._other)
                 # As a safety always ensure selected move is valid
                 if m in self._plyr.move_set:
                     return m
@@ -530,14 +535,14 @@ class DeepQAgent(Agent, nn.Module):
         y = self._q_net(x)
         return self._head_policy(y)
 
-    def _build_network_input(self) -> torch.Tensor:
-        r"""
-        Constructs the tensor to input into the Q-network.
-
-        :return: Tensor to put into the network
-        """
-        pieces = itertools.chain(self._plyr.pieces(), self._other.pieces())
-        return self._build_input_tensor(self._base_in, pieces, self._plyr)
+    # def _build_network_input(self) -> torch.Tensor:
+    #     r"""
+    #     Constructs the tensor to input into the Q-network.
+    #
+    #     :return: Tensor to put into the network
+    #     """
+    #     pieces = itertools.chain(self._plyr.pieces(), self._other.pieces())
+    #     return self._build_input_tensor(self._base_in, pieces, self._plyr)
 
     @staticmethod
     def _build_base_tensor(brd: Board, d_in) -> TensorDType:
@@ -574,6 +579,6 @@ class DeepQAgent(Agent, nn.Module):
             # Mark piece as present
             x[0, DeepQAgent._rank_lookup[p.rank], p.loc.r, p.loc.c] = color_val
             if p.color == next_player.color:
-                x[0, DeepQAgent._rank_lookup[p.rank], p.loc.r, p.loc.c] = color_val
+                x[0, DeepQAgent._next_turn_layer, p.loc.r, p.loc.c] = color_val
             # ToDo Need to update when imperfect information
         return x

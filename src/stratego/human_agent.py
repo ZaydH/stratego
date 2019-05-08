@@ -13,7 +13,7 @@ class HumanAgent(Agent):
     def get_next_move(self) -> Move:
         r""" Gets a valid move uniformly at random """
         while True:
-            print("Player %s - Enter you next move in the form:")
+            print("Player %s - Enter you next move in the form:" % self._plyr.color.name)
             print("   (CurrentRow,CurrentColumn) (NewRow,NewColumn)")
             m_str = input("Move: ").strip()
 

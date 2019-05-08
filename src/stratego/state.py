@@ -50,6 +50,11 @@ class State:
         return self.red if self._next == Color.RED else self.blue
 
     @property
+    def other_player(self) -> Player:
+        r""" Accessor for the player whose turn is NOT next """
+        return self.blue if self._next == Color.RED else self.red
+
+    @property
     def red(self) -> Player:
         r""" Accessor for the RED player """
         return self._red
