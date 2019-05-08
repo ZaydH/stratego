@@ -23,13 +23,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim
+from torch.optim.optimizer import Optimizer
 from tqdm import tqdm
 
 from stratego.utils import EXPORT_DIR
 from . import Location, Move, utils
 from .agent import Agent
 from .board import Board
-from .piece import Color, Piece, Rank
+from .piece import Piece, Rank
 from .player import Player
 from .state import State
 
@@ -204,8 +205,9 @@ class DeepQAgent(Agent, nn.Module):
     r""" Agent that encapsulates the Deep-Q algorithm described in papers such as:
     Mnih et al. "Playing Atari with Deep Reinforcement Learning." (2013).
     """
-    _RED_PIECE_VAL = 1
-    _BLUE_PIECE_VAL = -1
+    _PIECE_VAL = 1.
+    # _RED_PIECE_VAL = 1
+    # _BLUE_PIECE_VAL = -1
     _IMPASSABLE_VAL = 1
 
     _NUM_RES_BLOCKS = 3
@@ -217,7 +219,7 @@ class DeepQAgent(Agent, nn.Module):
     _gamma = 0.98
     _lr = 1e-4
     _f_loss = nn.MSELoss()
-    _INVALID_MOVE_REWARD = - torch.ones((1, 1))  # Must be -1 since output is tanh
+    _INVALID_MOVE_REWARD = -torch.ones((1, 1))  # Must be -1 since output is tanh
     _LOSS_REWARD = -torch.ones_like(_INVALID_MOVE_REWARD)
     _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
 
@@ -226,11 +228,11 @@ class DeepQAgent(Agent, nn.Module):
     # Converts rank to a layer
     _rank_lookup = {r: i for i, r in enumerate(Rank.get_all())}
     # Layer for a piece whose rank is unknown
-    _unk_rank_layer = Rank.count()
+    _unk_rank_layer = 2 * Rank.count()
     # Layer where impassable locations are marked
     _impass_layer = _unk_rank_layer + 1
-    # Layer indicating whose turn is next
-    _next_turn_layer = _impass_layer + 1
+    # # Layer indicating whose turn is next
+    # _next_turn_layer = _impass_layer + 1
 
     _EXPORTED_MODEL = EXPORT_DIR / "final_deep_q.pth"
 
@@ -252,7 +254,7 @@ class DeepQAgent(Agent, nn.Module):
         # Layer d: 1 for any piece of unknown rank (not used)
         # Layer d+1: 1 for an impassable location, 0 otherwise
         # Layer d+2: 1 for which player's turn is next, 0 otherwise
-        self._d_in = Rank.count() + 3
+        self._d_in = 2 * Rank.count() + 2
 
         self._EPS_END = eps_end
 
@@ -298,16 +300,20 @@ class DeepQAgent(Agent, nn.Module):
             progress_bar = tqdm(range(self._T), total=self._T, file=sys.stdout)
             for _ in progress_bar:
                 # With probability < \epsilon, select a random action
-                if random.random() < self._eps: t.a = t.s.next_player.get_random_move()
+                if random.random() < self._eps:
+                    t.a = t.s.next_player.get_random_move()
                 # Select (epsilon-)greedy action
-                else: t.a = self._get_state_move(t)
+                else:
+                    _, policy, t.a = self._get_state_move(t)
+                    # Treat illegal moves as an instant loss
+                    if not t.s.next_player.is_valid_next(t.a):
+                        t.r = self._INVALID_MOVE_REWARD
+                        self._punish_invalid_move(policy, optim)
+                        continue
 
                 # Handle case player already lost
                 if t.s.is_game_over():
                     t.r = self._LOSS_REWARD
-                # Treat illegal moves as an instant loss
-                elif not t.s.next_player.is_valid_next(t.a):
-                    t.r = self._INVALID_MOVE_REWARD
                 # Player about to win
                 elif t.a.is_attack() and t.a.attacked.rank == Rank.flag():
                     t.r = self._WIN_REWARD
@@ -321,9 +327,7 @@ class DeepQAgent(Agent, nn.Module):
                 if not j.is_terminal():
                     j.s.update(j.a)
                     # ToDo Need to fix how board state measured since player changed after this move
-                    x_j = DeepQAgent._build_input_tensor(j.base_tensor, j.s.pieces(),
-                                                         j.s.next_player)
-                    y_j_1_val, _ = torch.max(self.forward(x_j), dim=1, keepdim=True)
+                    _, y_j_1_val, _ = self._get_state_move(j)
                     y_j = y_j - self._gamma * y_j_1_val
                     # ToDo may need to rollback multiple moves
                     j.s.rollback()
@@ -342,6 +346,18 @@ class DeepQAgent(Agent, nn.Module):
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
 
+    def _punish_invalid_move(self, max_tensor: torch.Tensor, optim: Optimizer) -> None:
+        r"""
+        Updates the network to punish for illegal moves
+
+        :param max_tensor: Max tensor from the learner
+        :param optim: Optimizer
+        """
+        loss = self._f_loss(max_tensor, DeepQAgent._INVALID_MOVE_REWARD)
+        optim.zero_grad()
+        loss.backward()
+        optim.step()
+
     def _num_scout_moves(self) -> int:
         r"""
         Maximum number of moves a scout can perform. This function deliberately does not consider
@@ -350,21 +366,22 @@ class DeepQAgent(Agent, nn.Module):
         """
         return (self._brd.num_cols - 1) + (self._brd.num_rows - 1)
 
-    # def _get_state_move(self, s: ReplayStateTuple) -> Tuple[int, Move]:
-    def _get_state_move(self, s: ReplayStateTuple) -> Move:
+    def _get_state_move(self, state_tuple: ReplayStateTuple) -> Tuple[int, torch.Tensor, Move]:
         r"""
         Gets the move corresponding to the specified state
 
-        :param s: Deep-Q learning state
-        :return: Best move as predicted by the Q network
+        :param state_tuple: Deep-Q learning state
+        :return: Tuple of the output node, maximum valued error, and the selected move respectively
         """
-        x = DeepQAgent._build_input_tensor(s.base_tensor, s.s.pieces(), s.s.next_player)
+        x = DeepQAgent._build_input_tensor(state_tuple.base_tensor, state_tuple.s.pieces(),
+                                           state_tuple.s.next_player)
         policy = self.forward(x)
         output_node = int(torch.argmax(policy))
-        move = self._convert_output_node_to_move(output_node, s.s.next_player,
-                                                 s.s.get_other_player(s.s.next_player))
+        move = self._convert_output_node_to_move(output_node, state_tuple.s.next_player,
+                                                 state_tuple.s.other_player)
         # return output_node, move
-        return move
+        max_tensor, _ = policy.max(dim=1, keepdim=True)
+        return output_node, max_tensor, move
 
     def _get_move_from_output_node(self, output_node: Union[torch.Tensor, int],
                                    plyr: Player, other: Player) -> Move:
@@ -391,7 +408,8 @@ class DeepQAgent(Agent, nn.Module):
     def _convert_output_node_to_move(self, output_node: Union[torch.Tensor, int], plyr: Player,
                                      other: Player) -> Move:
         r"""
-        Creates the \p Move object corresponding to the specified output_node for plyr and other.
+        Creates the \p Move object corresponding to the specified \p output_node for \p plyr
+        and \p other.
 
         :param output_node: Output node number for the network
         :param plyr: Player making the move
@@ -561,12 +579,16 @@ class DeepQAgent(Agent, nn.Module):
         """
         x = base_in.clone()
         for p in pieces:
-            if p.color == Color.RED: color_val = DeepQAgent._RED_PIECE_VAL
-            else: color_val = DeepQAgent._BLUE_PIECE_VAL
-
-            # Mark piece as present
-            x[0, DeepQAgent._rank_lookup[p.rank], p.loc.r, p.loc.c] = color_val
-            if p.color == next_player.color:
-                x[0, DeepQAgent._next_turn_layer, p.loc.r, p.loc.c] = color_val
+            layer_num = 2 * DeepQAgent._rank_lookup[p.rank]
+            if p.color != next_player.color:
+                layer_num += 1
+            x[0, layer_num, p.loc.r, p.loc.c] = DeepQAgent._PIECE_VAL
+            # if p.color == Color.RED: color_val = DeepQAgent._RED_PIECE_VAL
+            # else: color_val = DeepQAgent._BLUE_PIECE_VAL
+            #
+            # # Mark piece as present
+            # x[0, DeepQAgent._rank_lookup[p.rank], p.loc.r, p.loc.c] = color_val
+            # if p.color == next_player.color:
+            #     x[0, DeepQAgent._next_turn_layer, p.loc.r, p.loc.c] = color_val
             # ToDo Need to update when imperfect information
         return x
