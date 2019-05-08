@@ -296,6 +296,10 @@ class DeepQAgent(Agent, nn.Module):
             # noinspection PyProtectedMember
             t = ReplayStateTuple(s=copy.deepcopy(s_0),
                                  base_tensor=DeepQAgent._build_base_tensor(s_0.board, self.d_in))
+
+            f_out = open("deep-q_train_moves.txt", "w+")
+            f_out.write("# PlayerColor,StartLoc,EndLoc")
+
             logging.info("Starting episode %d of %d", episode, self._M)
             progress_bar = tqdm(range(self._T), total=self._T, file=sys.stdout)
             for _ in progress_bar:
@@ -321,6 +325,7 @@ class DeepQAgent(Agent, nn.Module):
                 else:
                     t.r = torch.zeros_like(self._WIN_REWARD)
                 self._replay.add(t)
+                f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
 
                 j = self._replay.get_random()
                 y_j = j.r
@@ -341,6 +346,7 @@ class DeepQAgent(Agent, nn.Module):
                 # Advance to next state
                 if t.s.is_game_over(): break
                 if t.a in t.s.next_player.move_set: t.s.update(t.a)
+            f_out.close()
             utils.save_module(self, EXPORT_DIR / ("episode_%04d.pth" % episode))
             logging.info("COMPLETED episode %d of %d", episode, self._M)
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
