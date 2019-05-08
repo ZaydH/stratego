@@ -336,7 +336,7 @@ class DeepQAgent(Agent, nn.Module):
                 self._configure_players(t)
                 if t.s.is_game_over(): break
                 if t.a in t.s.next_player.move_set: t.s.update(t.a)
-            utils.save_module(self, EXPORT_DIR / "episode_%04d.pth" % episode)
+            utils.save_module(self, EXPORT_DIR / ("episode_%04d.pth" % episode))
             logging.info("COMPLETED episode %d of %d", episode, self._M)
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
