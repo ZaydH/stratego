@@ -297,7 +297,6 @@ class DeepQAgent(Agent, nn.Module):
             logging.info("Starting episode %d of %d", episode, self._M)
             progress_bar = tqdm(range(self._T), total=self._T, file=sys.stdout)
             for _ in progress_bar:
-                self._configure_players(t)
                 # With probability < \epsilon, select a random action
                 if random.random() < self._eps: t.a = t.s.next_player.get_random_move()
                 # Select (epsilon-)greedy action
@@ -319,7 +318,6 @@ class DeepQAgent(Agent, nn.Module):
 
                 j = self._replay.get_random()
                 y_j = j.r
-                self._configure_players(j)
                 if not j.is_terminal():
                     j.s.update(j.a)
                     # ToDo Need to fix how board state measured since player changed after this move
