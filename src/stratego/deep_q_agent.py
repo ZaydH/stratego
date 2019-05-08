@@ -348,11 +348,8 @@ class DeepQAgent(Agent, nn.Module):
 
         :param t: State tuple for training the network
         """
-        if t.s.next_player == self._plyr:
-            return
-        temp = self._plyr
-        self._plyr = self._other
-        self._other = temp
+        self._plyr = t.s.next_player
+        self._other = t.s.get_other_player(t.s.next_player)
 
     def _num_scout_moves(self) -> int:
         r"""

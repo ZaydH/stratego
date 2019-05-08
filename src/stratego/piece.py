@@ -157,11 +157,12 @@ class Rank:
         if other.value == Rank.FLAG:
             return True
         if self.value == Rank.SPY:
-            return other.value == self.MARSHALL
+            return other.value == Rank.MARSHALL
         if other.value == Rank.SPY:
             return True
         if other.value == Rank.BOMB:
-            return self.value == self.MINER
+            return self.value == Rank.MINER
+        # Use less than since strong piece has lower rank value
         return self.value < other.value
 
     def __ge__(self, other):

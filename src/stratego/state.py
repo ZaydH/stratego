@@ -242,8 +242,7 @@ class State:
             self._delete_moveset_info(m.new)
 
         # In case of an attack, need to add back the piece removed
-        attacked_removed = m.is_attack() and m.piece.rank >= m.attacked.rank
-        if attacked_removed:
+        if m.is_attacked_deleted():
             other.add_piece(m.attacked, mv_plyr)
             self._update_moveset_after_piece_add(m.new)
 
@@ -252,9 +251,11 @@ class State:
         self._update_moveset_after_piece_add(m.orig)
 
         # Update the printer
-        if m.is_move_successful(): self._printer.delete_piece(m.new)
+        if m.is_move_successful():
+            self._printer.delete_piece(m.new)
         self._printer.add_piece(m.piece)
-        if attacked_removed: self._printer.add_piece(m.attacked)
+        if m.is_attacked_deleted():
+            self._printer.add_piece(m.attacked)
 
         # Switch player and update stack only after undo successful
         self.toggle_next_color()
@@ -276,7 +277,7 @@ class State:
         """
         # Do not use < compare since this will cause runtime error because of how __gt__ checks
         # ranks for stationary pieces
-        if move.piece.rank != move.attacked.rank and not move.is_attack_successful():
+        if not move.is_attacked_deleted():
             return
 
         other = self.get_player(move.attacked.color)

@@ -85,6 +85,13 @@ class Move:
         assert self.is_attack()
         return self.piece.rank > self.attacked.rank
 
+    def is_attacked_deleted(self):
+        r"""
+        Return True if the \p attacked piece is to be deleted.  If it is not an attack, return False
+        """
+        if not self.is_attack(): return False
+        return self.piece.rank >= self.attacked.rank
+
     def is_game_over(self) -> bool:
         r""" Return True if the move attacked the flag """
         return self.is_attack() and self.attacked.rank == Rank.flag()
