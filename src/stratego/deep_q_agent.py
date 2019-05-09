@@ -214,15 +214,15 @@ class DeepQAgent(Agent, nn.Module):
     _NUM_RES_BLOCKS = 3
 
     # Training parameters
-    _M = 100000
+    _M = 10000
     _T = 4000  # Maximum number of moves for a state
     _EPS_START = 0.25
     _gamma = 0.98
-    _lr = 1e-4
+    _lr = 1e-3
     # _f_loss = nn.MSELoss()
     # _INVALID_MOVE_REWARD = -torch.ones((1, 1))  # Must be -1 since output is tanh
     # _LOSS_REWARD = -torch.ones_like(_INVALID_MOVE_REWARD)
-    _f_loss = nn.BCELoss()
+    _f_loss = nn.MSELoss()
     _INVALID_MOVE_REWARD = torch.zeros((1, 1))  # Must be -1 since output is tanh
     _LOSS_REWARD = _INVALID_MOVE_REWARD
     _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
@@ -307,8 +307,8 @@ class DeepQAgent(Agent, nn.Module):
 
             num_invalid_moves = 0
             logging.info("Starting episode %d of %d", episode, self._M)
-            progress_bar = tqdm(range(self._T), total=self._T, file=sys.stdout)
-            for _ in progress_bar:
+            i, progress_bar = 1, tqdm(range(self._T), total=self._T, file=sys.stdout)
+            for i in progress_bar:
                 # With probability < \epsilon, select a random action
                 if not t.s.next_player.move_set.is_empty():
 
@@ -348,7 +348,7 @@ class DeepQAgent(Agent, nn.Module):
                     j.s.rollback()
 
                 q_j = self._get_action_output_score(j)
-                loss = self._f_loss(q_j, y_j)
+                loss = self._f_loss(y_j, q_j)
                 optim.zero_grad()
                 loss.backward()
                 optim.step()
@@ -362,6 +362,7 @@ class DeepQAgent(Agent, nn.Module):
             utils.save_module(self, EXPORT_DIR / ("episode_%04d.pth" % episode))
             logging.info("COMPLETED episode %d of %d", episode, self._M)
             logging.info("Episode %d: Number of Invalid Moves = %d", episode, num_invalid_moves)
+            logging.info("Episode %d: Frac. Moves Invalid = %.4f", episode, num_invalid_moves / i)
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
 
@@ -374,9 +375,11 @@ class DeepQAgent(Agent, nn.Module):
         :param policy: Policy tensor for an invalid move
         :param optim: Optimizer
         """
-        loss = self._f_loss(policy[:, output_node:output_node+1], DeepQAgent._INVALID_MOVE_REWARD)
+        p = policy[:, output_node:output_node+1].log().clamp_min(-15)
+        # p = torch.cat((p, p.neg().add(1)), dim=1)
+        # loss = nn.NLLLoss().forward(p, torch.ones((p.shape[0],)))
         optim.zero_grad()
-        loss.backward()
+        p.backward()
         optim.step()
 
     def _num_scout_moves(self) -> int:
