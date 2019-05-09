@@ -219,6 +219,9 @@ class MoveSet:
         r""" Returns \p True if the \p MoveSet is empty """
         return not bool(self.avail)
 
+    def __iter__(self):
+        return iter(self.avail.values())
+
 
 class Player:
     r""" Represents one of the two players """

@@ -15,7 +15,7 @@ import logging
 import operator as op
 import random
 import sys
-from typing import Tuple, Iterable, Union
+from typing import Tuple, Iterable, Union, List
 from dataclasses import dataclass
 
 import numpy as np
@@ -302,7 +302,7 @@ class DeepQAgent(Agent, nn.Module):
             f_out = open("deep-q_train_moves.txt", "w+")
             f_out.write("# PlayerColor,StartLoc,EndLoc")
 
-            num_invalid_moves = num_rand_moves = 0
+            num_rand_moves = 0
             logging.info("Starting episode %d of %d", episode, self._M)
             i, progress_bar = 1, tqdm(range(self._T), total=self._T, file=sys.stdout)
             for i in progress_bar:
@@ -313,12 +313,7 @@ class DeepQAgent(Agent, nn.Module):
                         num_rand_moves += 1
                     # Select (epsilon-)greedy action
                     else:
-                        output_node, policy, _, t.a = self._get_state_move(t)
-                        # Treat illegal moves as an instant loss
-                        if not t.s.next_player.is_valid_next(t.a):
-                            num_invalid_moves += 1
-                            self._punish_invalid_move(output_node, policy, optim)
-                            t.a = t.s.next_player.get_random_move()
+                        output_node, policy, _, t.a = self._get_state_move(t, null_policy=True)
                     f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
                     f_out.flush()
 
@@ -337,8 +332,9 @@ class DeepQAgent(Agent, nn.Module):
                     if j.s.next_player.move_set.is_empty():
                         y_j = DeepQAgent._WIN_REWARD
                     else:
+                        self._punish_invalid_move(j, optim)
                         # ToDo Need to fix how board state measured since player changed after move
-                        _, _, y_j_1_val, _ = self._get_state_move(j)
+                        _, _, y_j_1_val, _ = self._get_state_move(j, null_policy=True)
                         y_j = y_j - self._gamma * y_j_1_val
                         # ToDo may need to rollback multiple moves
                     j.s.rollback()
@@ -357,23 +353,21 @@ class DeepQAgent(Agent, nn.Module):
             f_out.close()
             utils.save_module(self, EXPORT_DIR / ("episode_%04d.pth" % episode))
             logging.info("COMPLETED episode %d of %d", episode, self._M)
-            logging.info("Episode %d: Number of Invalid Moves = %d", episode, num_invalid_moves)
-            logging.info("Episode %d: Frac. Moves Invalid = %.4f", episode, num_invalid_moves / i)
             logging.info("Episode %d: Number of Random Moves = %d", episode, num_rand_moves)
             logging.info("Episode %d: Frac. Moves Random = %.4f", episode, num_rand_moves / i)
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
 
-    def _punish_invalid_move(self, output_node: int, policy: torch.Tensor,
-                             optim: Optimizer) -> None:
+    def _punish_invalid_move(self, state_tuple: ReplayStateTuple, optim: Optimizer) -> None:
         r"""
         Updates the network to punish for illegal moves
 
-        :param output_node: Output node selected as the move
-        :param policy: Policy tensor for an invalid move
+        :param state_tuple: State tuple to be zeroed out
         :param optim: Optimizer
         """
-        p = self._f_loss(policy[:, output_node:output_node+1], self._INVALID_MOVE_REWARD)
+        _, policy, _, _ = self._get_state_move(state_tuple)
+        nulled_policy = self._null_blocked_moves(state_tuple, policy, clone=True)
+        p = self._f_loss(policy, nulled_policy)
         optim.zero_grad()
         p.backward()
         optim.step()
@@ -386,24 +380,52 @@ class DeepQAgent(Agent, nn.Module):
         """
         return (self._brd.num_cols - 1) + (self._brd.num_rows - 1)
 
-    def _get_state_move(self, state_tuple: ReplayStateTuple) -> \
-            Tuple[int, torch.Tensor, torch.Tensor, Move]:
+    def _get_state_move(self, state_tuple: ReplayStateTuple,
+                        null_policy: bool = False) -> Tuple[int, torch.Tensor, torch.Tensor, Move]:
         r"""
         Gets the move corresponding to the specified state
 
         :param state_tuple: Deep-Q learning state
+        :param null_policy: If True, null out the blocked moves to ensure they are not selected
         :return: Tuple of the output node, entire policy tensor, maximum valued error, and the
                  selected move respectively
         """
         x = DeepQAgent._build_input_tensor(state_tuple.base_tensor, state_tuple.s.pieces(),
                                            state_tuple.s.next_player)
         policy = self.forward(x)
+        if null_policy:
+            policy = self._null_blocked_moves(state_tuple, policy, clone=True)
         output_node = int(torch.argmax(policy))
         move = self._convert_output_node_to_move(output_node, state_tuple.s.next_player,
                                                  state_tuple.s.other_player)
         # return output_node, move
         max_tensor, _ = policy.max(dim=1, keepdim=True)
         return output_node, policy, max_tensor, move
+
+    def _build_blocked_move_set(self, state_tuple: ReplayStateTuple) -> List[int]:
+        r"""
+        Constructs the list of output nodes that are blocked from moving
+
+        :param state_tuple: State tuple to be used
+        :return: List of blocked nodes
+        """
+        valid = {self._get_output_node_from_move(m) for m in state_tuple.s.next_player.move_set}
+        return [i for i in range(self._d_out) if i not in valid]
+
+    def _null_blocked_moves(self, state_tuple: ReplayStateTuple,
+                            policy: torch.Tensor, clone: bool = False) -> torch.Tensor:
+        """
+        Sets all moves that are blocked to the minimum value so they are no selected
+        :param state_tuple: State tuple to reference
+        :param policy: Policy tensor from Deep-Q network
+        :param clone: If True, do not perform null in place
+        :return: Updated policy tensor with blocked nodes
+        """
+        blocked_nodes = self._build_blocked_move_set(state_tuple)
+        if clone:
+            policy = policy.clone()
+        policy[:, blocked_nodes] = DeepQAgent._LOSS_REWARD
+        return policy
 
     def _get_move_from_output_node(self, output_node: Union[torch.Tensor, int],
                                    plyr: Player, other: Player) -> Move:
