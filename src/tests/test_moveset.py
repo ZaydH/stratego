@@ -9,7 +9,6 @@ r"""
     :license: MIT, see LICENSE for more details.
 """
 
-from stratego.location import Location
 from stratego.state import State
 
 from testing_utils import STATES_PATH, STD_BRD
