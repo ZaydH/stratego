@@ -215,8 +215,8 @@ class DeepQAgent(Agent, nn.Module):
 
     # Training parameters
     _M = 100000
-    _T = 4000  # Maximum number of moves for a state
-    _EPS_START = 0.10
+    _T = 900  # Maximum number of moves for a state
+    _EPS_START = 0.25
     _gamma = 0.98
     _lr = 1e-2
     _f_loss = nn.MSELoss()
@@ -410,6 +410,7 @@ class DeepQAgent(Agent, nn.Module):
         :return: List of blocked nodes
         """
         valid = {self._get_output_node_from_move(m) for m in state_tuple.s.next_player.move_set}
+        valid -= state_tuple.s.get_cyclic_move()
         return [i for i in range(self._d_out) if i not in valid]
 
     def _null_blocked_moves(self, state_tuple: ReplayStateTuple,

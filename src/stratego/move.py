@@ -162,6 +162,9 @@ class MoveStack:
         r""" Return True if \p MoveStack is empty """
         return not bool(self._buf)
 
+    def __getitem__(self, item: int) -> Move:
+        return self._buf[item]
+
     def __len__(self) -> int:
         r""" Number of elements in the stack """
         return len(self._buf)

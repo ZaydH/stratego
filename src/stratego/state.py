@@ -1,7 +1,7 @@
 import itertools
 from enum import Enum
 from pathlib import Path
-from typing import Union, Iterable
+from typing import Union, Iterable, Set
 
 from stratego import Printer
 from .board import Board
@@ -139,6 +139,12 @@ class State:
             if not plyr.has_flag():
                 raise ValueError("Player %s does not have a flag" % plyr.color.name)
         return True
+
+    def get_cyclic_move(self) -> Set[Move]:
+        r""" Gets the move (if any) blocked because it would be cyclic """
+        if len(self._stack) >= 4 and self._stack[-2] == self._stack[-4]:
+            return {self._stack[-2]}
+        return set()
 
     @staticmethod
     def _print_template_file(file_path: Union[Path, str]) -> None:
