@@ -86,8 +86,8 @@ def _build_policy_head(in_planes: int, out_planes: int, board_dim: Tuple[int, in
                         ActCls(),
                         Flatten2Dto1D(),
                         nn.Linear(ff_in_dim, out_dim),
-                        nn.Softmax(dim=1)  # Softmax across columns
-                        # nn.Tanh()  # Tanh changed from AlphaGo Zero paper since no value head
+                        # nn.Softmax(dim=1)  # Softmax across columns
+                        nn.Tanh()  # Tanh changed from AlphaGo Zero paper since no value head
                         )
     return seq
 
@@ -173,7 +173,7 @@ class ReplayMemory:
 
     Mnih et al. "Playing Atari with Deep Reinforcement Learning." (2013).
     """
-    _N = 1000
+    _N = 10000
 
     def __init__(self):
         self._buf = []
@@ -214,19 +214,16 @@ class DeepQAgent(Agent, nn.Module):
     _NUM_RES_BLOCKS = 3
 
     # Training parameters
-    _M = 10000
+    _M = 100000
     _T = 4000  # Maximum number of moves for a state
-    _EPS_START = 0.25
+    _EPS_START = 0.10
     _gamma = 0.98
-    _lr = 1e-3
-    # _f_loss = nn.MSELoss()
-    # _INVALID_MOVE_REWARD = -torch.ones((1, 1))  # Must be -1 since output is tanh
-    # _LOSS_REWARD = -torch.ones_like(_INVALID_MOVE_REWARD)
+    _lr = 1e-2
     _f_loss = nn.MSELoss()
-    _INVALID_MOVE_REWARD = torch.zeros((1, 1))  # Must be -1 since output is tanh
+    _INVALID_MOVE_REWARD = -torch.ones((1, 1))  # Must be -1 since output is tanh
     _LOSS_REWARD = _INVALID_MOVE_REWARD
+    _NO_REWARD = torch.full_like(_INVALID_MOVE_REWARD, -0.1)
     _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
-    _NO_REWARD = torch.full_like(_LOSS_REWARD, 0.5)
 
     TERMINAL_REWARDS = (_LOSS_REWARD, _WIN_REWARD, _INVALID_MOVE_REWARD)
 
@@ -305,24 +302,23 @@ class DeepQAgent(Agent, nn.Module):
             f_out = open("deep-q_train_moves.txt", "w+")
             f_out.write("# PlayerColor,StartLoc,EndLoc")
 
-            num_invalid_moves = 0
+            num_invalid_moves = num_rand_moves = 0
             logging.info("Starting episode %d of %d", episode, self._M)
             i, progress_bar = 1, tqdm(range(self._T), total=self._T, file=sys.stdout)
             for i in progress_bar:
                 # With probability < \epsilon, select a random action
                 if not t.s.next_player.move_set.is_empty():
-
                     if random.random() < self._eps:
                         t.a = t.s.next_player.get_random_move()
+                        num_rand_moves += 1
                     # Select (epsilon-)greedy action
                     else:
                         output_node, policy, _, t.a = self._get_state_move(t)
                         # Treat illegal moves as an instant loss
                         if not t.s.next_player.is_valid_next(t.a):
-                            t.r = self._INVALID_MOVE_REWARD
                             num_invalid_moves += 1
                             self._punish_invalid_move(output_node, policy, optim)
-                            continue
+                            t.a = t.s.next_player.get_random_move()
                     f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
                     f_out.flush()
 
@@ -343,7 +339,7 @@ class DeepQAgent(Agent, nn.Module):
                     else:
                         # ToDo Need to fix how board state measured since player changed after move
                         _, _, y_j_1_val, _ = self._get_state_move(j)
-                        y_j = y_j + self._gamma * (DeepQAgent._WIN_REWARD - y_j_1_val)
+                        y_j = y_j - self._gamma * y_j_1_val
                         # ToDo may need to rollback multiple moves
                     j.s.rollback()
 
@@ -363,6 +359,8 @@ class DeepQAgent(Agent, nn.Module):
             logging.info("COMPLETED episode %d of %d", episode, self._M)
             logging.info("Episode %d: Number of Invalid Moves = %d", episode, num_invalid_moves)
             logging.info("Episode %d: Frac. Moves Invalid = %.4f", episode, num_invalid_moves / i)
+            logging.info("Episode %d: Number of Random Moves = %d", episode, num_rand_moves)
+            logging.info("Episode %d: Frac. Moves Random = %.4f", episode, num_rand_moves / i)
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
 
@@ -375,9 +373,7 @@ class DeepQAgent(Agent, nn.Module):
         :param policy: Policy tensor for an invalid move
         :param optim: Optimizer
         """
-        p = policy[:, output_node:output_node+1].log().clamp_min(-15)
-        # p = torch.cat((p, p.neg().add(1)), dim=1)
-        # loss = nn.NLLLoss().forward(p, torch.ones((p.shape[0],)))
+        p = self._f_loss(policy[:, output_node:output_node+1], self._INVALID_MOVE_REWARD)
         optim.zero_grad()
         p.backward()
         optim.step()
