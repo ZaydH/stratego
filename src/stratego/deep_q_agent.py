@@ -86,8 +86,9 @@ def _build_policy_head(in_planes: int, out_planes: int, board_dim: Tuple[int, in
                         ActCls(),
                         Flatten2Dto1D(),
                         nn.Linear(ff_in_dim, out_dim),
-                        # nn.Softmax())
-                        nn.Tanh())  # Tanh changed from AlphaGo Zero paper since no value head
+                        nn.Softmax(dim=1)  # Softmax across columns
+                        # nn.Tanh()  # Tanh changed from AlphaGo Zero paper since no value head
+                        )
     return seq
 
 
@@ -218,10 +219,14 @@ class DeepQAgent(Agent, nn.Module):
     _EPS_START = 0.25
     _gamma = 0.98
     _lr = 1e-4
-    _f_loss = nn.MSELoss()
-    _INVALID_MOVE_REWARD = -torch.ones((1, 1))  # Must be -1 since output is tanh
-    _LOSS_REWARD = -torch.ones_like(_INVALID_MOVE_REWARD)
+    # _f_loss = nn.MSELoss()
+    # _INVALID_MOVE_REWARD = -torch.ones((1, 1))  # Must be -1 since output is tanh
+    # _LOSS_REWARD = -torch.ones_like(_INVALID_MOVE_REWARD)
+    _f_loss = nn.BCELoss()
+    _INVALID_MOVE_REWARD = torch.zeros((1, 1))  # Must be -1 since output is tanh
+    _LOSS_REWARD = _INVALID_MOVE_REWARD
     _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
+    _NO_REWARD = torch.full_like(_LOSS_REWARD, 0.5)
 
     TERMINAL_REWARDS = (_LOSS_REWARD, _WIN_REWARD, _INVALID_MOVE_REWARD)
 
@@ -300,33 +305,33 @@ class DeepQAgent(Agent, nn.Module):
             f_out = open("deep-q_train_moves.txt", "w+")
             f_out.write("# PlayerColor,StartLoc,EndLoc")
 
+            num_invalid_moves = 0
             logging.info("Starting episode %d of %d", episode, self._M)
             progress_bar = tqdm(range(self._T), total=self._T, file=sys.stdout)
             for _ in progress_bar:
                 # With probability < \epsilon, select a random action
                 if not t.s.next_player.move_set.is_empty():
+
                     if random.random() < self._eps:
                         t.a = t.s.next_player.get_random_move()
                     # Select (epsilon-)greedy action
                     else:
-                        _, policy, t.a = self._get_state_move(t)
+                        output_node, policy, _, t.a = self._get_state_move(t)
                         # Treat illegal moves as an instant loss
                         if not t.s.next_player.is_valid_next(t.a):
                             t.r = self._INVALID_MOVE_REWARD
-                            self._punish_invalid_move(policy, optim)
+                            num_invalid_moves += 1
+                            self._punish_invalid_move(output_node, policy, optim)
                             continue
                     f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
                     f_out.flush()
 
                 # Handle case player already lost
-                if t.s.is_game_over():
-                    t.r = self._LOSS_REWARD
+                if t.s.is_game_over(): t.r = self._LOSS_REWARD
                 # Player about to win
-                elif t.a.is_attack() and t.a.attacked.rank == Rank.flag():
-                    t.r = self._WIN_REWARD
+                elif t.a.is_attack() and t.a.attacked.rank == Rank.flag(): t.r = self._WIN_REWARD
                 # Game not over yet
-                else:
-                    t.r = torch.zeros_like(self._WIN_REWARD)
+                else: t.r = self._NO_REWARD
                 self._replay.add(t)
 
                 j = self._replay.get_random()
@@ -334,11 +339,11 @@ class DeepQAgent(Agent, nn.Module):
                 if not j.is_terminal():
                     j.s.update(j.a)
                     if j.s.next_player.move_set.is_empty():
-                        y_j = -DeepQAgent._LOSS_REWARD
+                        y_j = DeepQAgent._WIN_REWARD
                     else:
                         # ToDo Need to fix how board state measured since player changed after move
-                        _, y_j_1_val, _ = self._get_state_move(j)
-                        y_j = y_j - self._gamma * y_j_1_val
+                        _, _, y_j_1_val, _ = self._get_state_move(j)
+                        y_j = y_j + self._gamma * (DeepQAgent._WIN_REWARD - y_j_1_val)
                         # ToDo may need to rollback multiple moves
                     j.s.rollback()
 
@@ -356,17 +361,20 @@ class DeepQAgent(Agent, nn.Module):
             f_out.close()
             utils.save_module(self, EXPORT_DIR / ("episode_%04d.pth" % episode))
             logging.info("COMPLETED episode %d of %d", episode, self._M)
+            logging.info("Episode %d: Number of Invalid Moves = %d", episode, num_invalid_moves)
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
 
-    def _punish_invalid_move(self, max_tensor: torch.Tensor, optim: Optimizer) -> None:
+    def _punish_invalid_move(self, output_node: int, policy: torch.Tensor,
+                             optim: Optimizer) -> None:
         r"""
         Updates the network to punish for illegal moves
 
-        :param max_tensor: Max tensor from the learner
+        :param output_node: Output node selected as the move
+        :param policy: Policy tensor for an invalid move
         :param optim: Optimizer
         """
-        loss = self._f_loss(max_tensor, DeepQAgent._INVALID_MOVE_REWARD)
+        loss = self._f_loss(policy[:, output_node:output_node+1], DeepQAgent._INVALID_MOVE_REWARD)
         optim.zero_grad()
         loss.backward()
         optim.step()
@@ -379,12 +387,14 @@ class DeepQAgent(Agent, nn.Module):
         """
         return (self._brd.num_cols - 1) + (self._brd.num_rows - 1)
 
-    def _get_state_move(self, state_tuple: ReplayStateTuple) -> Tuple[int, torch.Tensor, Move]:
+    def _get_state_move(self, state_tuple: ReplayStateTuple) -> \
+            Tuple[int, torch.Tensor, torch.Tensor, Move]:
         r"""
         Gets the move corresponding to the specified state
 
         :param state_tuple: Deep-Q learning state
-        :return: Tuple of the output node, maximum valued error, and the selected move respectively
+        :return: Tuple of the output node, entire policy tensor, maximum valued error, and the
+                 selected move respectively
         """
         x = DeepQAgent._build_input_tensor(state_tuple.base_tensor, state_tuple.s.pieces(),
                                            state_tuple.s.next_player)
@@ -394,7 +404,7 @@ class DeepQAgent(Agent, nn.Module):
                                                  state_tuple.s.other_player)
         # return output_node, move
         max_tensor, _ = policy.max(dim=1, keepdim=True)
-        return output_node, max_tensor, move
+        return output_node, policy, max_tensor, move
 
     def _get_move_from_output_node(self, output_node: Union[torch.Tensor, int],
                                    plyr: Player, other: Player) -> Move:
@@ -501,7 +511,7 @@ class DeepQAgent(Agent, nn.Module):
         for i in range(self._NUM_RES_BLOCKS):
             self._q_net.add_module("Res_%02d" % i, ResBlock())
 
-        self._head_policy = _build_policy_head(ResBlock.NUM_PLANES, out_planes=1,
+        self._head_policy = _build_policy_head(ResBlock.NUM_PLANES, out_planes=2,
                                                board_dim=self._brd.dim(), out_dim=self.d_out)
         # self._head_value = _build_value_head(ResBlock.NUM_PLANES, out_planes=1,
         #                                      board_dim=self._brd.dim())
