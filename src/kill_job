@@ -1,0 +1,2 @@
+# First command line argument is the job number (e.g., 184932)..
+scancel $1
