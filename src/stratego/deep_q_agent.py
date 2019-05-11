@@ -40,7 +40,7 @@ if IS_CUDA:
     device = torch.device('cuda:0')
     # noinspection PyUnresolvedReferences
     torch.set_default_tensor_type(torch.cuda.FloatTensor)
-ActCls = nn.ReLU
+ActCls = nn.LeakyReLU
 
 
 def _conv1x1(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1) -> nn.Module:
@@ -217,23 +217,23 @@ class DeepQAgent(Agent, nn.Module):
     _PIECE_VAL = 1.
     # _RED_PIECE_VAL = 1
     # _BLUE_PIECE_VAL = -1
-    _IMPASSABLE_VAL = 1
+    _IMPASSABLE_VAL = 1.
 
-    _NUM_RES_BLOCKS = 3
+    _NUM_RES_BLOCKS = 9
 
     # Training parameters
-    _M = 1000
+    _M = 10000
     _T = 1500  # Maximum number of moves for a state
     _EPS_START = 0.5
     _gamma = 0.98
-    _lr = 1e-2
+    _lr = 1e-3
     _f_loss = nn.MSELoss()
     _INVALID_MOVE_REWARD = -torch.ones((1, 1))  # Must be -1 since output is tanh
     _LOSS_REWARD = _INVALID_MOVE_REWARD
     _NO_REWARD = torch.full_like(_INVALID_MOVE_REWARD, -0.1)
     _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
 
-    _CHECKPOINT_EPISODE_FREQUENCY = 1
+    _CHECKPOINT_EPISODE_FREQUENCY = 100
     _NUM_HEAD_TO_HEAD_GAMES = 101
     # _NUM_HEAD_TO_HEAD_GAMES = 5
     _TRAIN_BEST_MODEL = EXPORT_DIR / "_checkpoint_best_model.pth"
@@ -313,8 +313,9 @@ class DeepQAgent(Agent, nn.Module):
         # If a trained model exists, load it. Otherwise, backup the default model
         if DeepQAgent._TRAIN_BEST_MODEL.exists():
             utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
+            bypass_first_head_to_head = False
         else:
-            utils.save_module(self, DeepQAgent._TRAIN_BEST_MODEL)
+            bypass_first_head_to_head = True
 
         self._replay = ReplayMemory()
         optim = torch.optim.Adam(self.parameters(), lr=self._lr)
@@ -327,7 +328,11 @@ class DeepQAgent(Agent, nn.Module):
             self._train_epoch(episode, t, optim)
 
             if episode % DeepQAgent._CHECKPOINT_EPISODE_FREQUENCY == 0:
-                self._compare_head_to_head(episode, s_0)
+                if bypass_first_head_to_head:
+                    utils.save_module(self, DeepQAgent._TRAIN_BEST_MODEL)
+                    bypass_first_head_to_head = False
+                else:
+                    self._compare_head_to_head(episode, s_0)
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
 
@@ -371,8 +376,8 @@ class DeepQAgent(Agent, nn.Module):
                 if j.s.next_player.move_set.is_empty():
                     y_j = DeepQAgent._WIN_REWARD
                 else:
-                    if episode < 10:
-                        self._punish_invalid_move(j, optim)
+                    # if episode < 10:
+                    #     self._punish_invalid_move(j, optim)
                     # ToDo Need to fix how board state measured since player changed after move
                     _, _, y_j_1_val, _ = self._get_state_move(j, null_policy=True)
                     y_j = y_j - self._gamma * y_j_1_val
@@ -496,7 +501,7 @@ class DeepQAgent(Agent, nn.Module):
     def _null_blocked_moves(self, state_tuple: ReplayStateTuple,
                             policy: torch.Tensor, clone: bool = False) -> torch.Tensor:
         """
-        Sets all moves that are blocked to the minimum value so they are no selected
+        Sets all moves that are blocked to the inimum value so they are no selected
         :param state_tuple: State tuple to reference
         :param policy: Policy tensor from Deep-Q network
         :param clone: If True, do not perform null in place
