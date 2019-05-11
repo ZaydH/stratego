@@ -357,7 +357,7 @@ class DeepQAgent(Agent, nn.Module):
                     num_rand_moves += 1
                 # Select (epsilon-)greedy action
                 else:
-                    output_node, policy, _, t.a = self._get_state_move(t, null_policy=True)
+                    output_node, _, _, t.a = self._get_state_move(t, null_policy=True)
                 f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
                 f_out.flush()
 
@@ -484,8 +484,7 @@ class DeepQAgent(Agent, nn.Module):
         move = self._convert_output_node_to_move(output_node, state_tuple.s.next_player,
                                                  state_tuple.s.other_player)
 
-        max_tensor, _ = policy.max(dim=1, keepdim=True)
-        return output_node, policy, max_tensor, move
+        return output_node, policy, policy[:, output_node:output_node+1], move
 
     def _build_invalid_move_set(self, state_tuple: ReplayStateTuple) -> List[int]:
         r"""
