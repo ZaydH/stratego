@@ -41,7 +41,8 @@ def setup_logger(quiet_mode: bool = False, filename: PathOrStr = "test.log",
     # noinspection PyProtectedMember
     # matplotlib._log.setLevel(logging.INFO)  # pylint: disable=protected-access
 
-    logging.info("******************* New Run Beginning *****************")
+    logging.debug("******************* New Run Beginning *****************")
+    logging.debug("CUDA: %s", "ENABLED" if IS_CUDA else "Disabled")
 
 
 def save_module(module: nn.Module, filepath: Union[Path, str]) -> None:
