@@ -326,7 +326,7 @@ class DeepQAgent(Agent, nn.Module):
             # noinspection PyProtectedMember
             t = ReplayStateTuple(s=copy.deepcopy(s_0),
                                  base_tensor=DeepQAgent._build_base_tensor(s_0.board, self.d_in))
-            self._train_epoch(episode, t, optim)
+            self._train_episode(episode, t, optim)
 
             if episode % DeepQAgent._CHECKPOINT_EPISODE_FREQUENCY == 0:
                 if bypass_first_head_to_head:
@@ -337,7 +337,7 @@ class DeepQAgent(Agent, nn.Module):
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
 
-    def _train_epoch(self, episode: int, t: ReplayStateTuple, optim: Optimizer) -> None:
+    def _train_episode(self, episode: int, t: ReplayStateTuple, optim: Optimizer) -> None:
         r"""
         Performs training for a single epoch
 
