@@ -211,8 +211,9 @@ class ReplayMemory:
 
 
 class DeepQAgent(Agent, nn.Module):
-    r""" Agent that encapsulates the Deep-Q algorithm described in papers such as:
-    Mnih et al. "Playing Atari with Deep Reinforcement Learning." (2013).
+    r"""
+    Agent that encapsulates the Deep-Q algorithm described in papers such as: Mnih et al. "Playing
+    Atari with Deep Reinforcement Learning." (2013).
     """
     _PIECE_VAL = 1.
     # _RED_PIECE_VAL = 1
@@ -423,9 +424,9 @@ class DeepQAgent(Agent, nn.Module):
                 cur_col, prev_col = game.blue, game.red
 
             cur = DeepQAgent(game.board, cur_col, game.state, disable_import=True)
-            utils.save_module(cur, temp_back_up)
+            utils.load_module(cur, temp_back_up)
             prev = DeepQAgent(game.board, prev_col, game.state, disable_import=True)
-            utils.save_module(prev, DeepQAgent._TRAIN_BEST_MODEL)
+            utils.load_module(prev, DeepQAgent._TRAIN_BEST_MODEL)
 
             cur._make_rand_move_prob = prev._make_rand_move_prob = max(0.05, self._eps / 2)
 
