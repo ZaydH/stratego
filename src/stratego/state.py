@@ -1,7 +1,7 @@
 import itertools
 from enum import Enum
 from pathlib import Path
-from typing import Union, Iterable, Set
+from typing import Union, Iterable, Set, Optional
 
 from stratego import Printer
 from .board import Board
@@ -319,6 +319,16 @@ class State:
         # Current player has no moves
         if self.next_player.move_set.is_empty(): return True
         return False
+
+    def get_winner(self) -> Optional[Color]:
+        r""" Gets the color of the winning player """
+        if not self.is_game_over():
+            return None
+        if not self._stack.is_empty() and self._stack.top().is_game_over():
+            return self._stack.top().piece.color
+        if self.next_player.move_set.is_empty():
+            return self.other_player.color
+        raise RuntimeError("Not able to determine winner")
 
     def write_board(self) -> str:
         r""" Return the board contents as a string """

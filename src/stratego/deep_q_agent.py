@@ -396,9 +396,15 @@ class DeepQAgent(Agent, nn.Module):
                 break
             t.s.update(t.a)
         f_out.close()
+
+        # Print the color of the winning player
+        winner = t.s.get_winner()
+        if winner is not None:
+            logging.debug("Episode %d: Winner is %s", episode, winner.name)
+
         logging.info("COMPLETED episode %d of %d", episode, self._M)
-        logging.info("Episode %d: Number of Random Moves = %d", episode, num_rand_moves)
-        logging.info("Episode %d: Frac. Moves Random = %.4f", episode, num_rand_moves / i)
+        logging.debug("Episode %d: Number of Random Moves = %d", episode, num_rand_moves)
+        logging.debug("Episode %d: Frac. Moves Random = %.4f", episode, num_rand_moves / i)
 
     def _compare_head_to_head(self, episode: int, s0: State):
         r""" Test if the current agent is better head to head than previous one """
