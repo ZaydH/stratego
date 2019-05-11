@@ -26,6 +26,10 @@ from testing_utils import NO_BLOCK_BRD, STATES_PATH, STD_BRD
 
 @pytest.fixture(scope="module")
 def switch_to_int_tensor():
+    r"""
+    Helper function to streamline testing to use integer tensors so no floating point errors in
+    the test calculations.
+    """
     orig_dtype = stratego.deep_q_agent.TensorDType
     stratego.deep_q_agent.TensorDType = torch.int32
     # Code that will run before your test, for example:
@@ -39,7 +43,7 @@ def _make_deep_q_agent(brd: Board = STD_BRD,
                        state_file: PathOrStr = STATES_PATH / "state_move_verify.txt") -> DeepQAgent:
     r""" Helper function used to create a generic Deep Q agent. """
     state = State.importer(state_file, brd)
-    return DeepQAgent(brd, state.red, state.blue, disable_import=True)
+    return DeepQAgent(brd, state.red, state, disable_import=True)
 
 
 # noinspection PyProtectedMember
@@ -145,7 +149,9 @@ def test_input_builder():
     r""" Verify that the input builder script works as expected """
     agent = _make_deep_q_agent()
 
-    for plyr, other in [(agent._plyr, agent._other), (agent._other, agent._plyr)]:
+    plyrs = [(agent._state.next_player, agent._state.other_player),
+             (agent._state.other_player, agent._state.next_player)]
+    for plyr, other in plyrs:
         t_in = agent._build_network_input(plyr, other)
         # verify the dimensions
         assert len(t_in.shape) == 4
