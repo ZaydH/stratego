@@ -437,6 +437,7 @@ class DeepQAgent(Agent, nn.Module):
             logging.debug("Episode %d: Winner is %s", episode, winner.name)
 
         logging.info("COMPLETED episode %d of %d", episode, self._M)
+        logging.debug("Episode %d: Number of epochs = %d", episode, i)
         logging.debug("Episode %d: Number of Random Moves = %d", episode, num_rand_moves)
         logging.debug("Episode %d: Frac. Moves Random = %.4f", episode, num_rand_moves / i)
 
