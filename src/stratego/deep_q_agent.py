@@ -297,6 +297,38 @@ class DeepQAgent(Agent, nn.Module):
         # Must be last in constructor to ensure proper CUDA enabling
         if IS_CUDA: self.cuda()
 
+    def _set_nn_param(self, name: str, val: Union[int, float]):
+        r"""
+        Helper function to standardize setting parameters in the \p Module.  These parameters will
+        be saved even after a saving of the state dictionary.
+
+        :param name: Name of the parameter to set
+        :param val: Value to set the parameter \p name
+        """
+        # noinspection PyUnresolvedReferences
+        tensor_type = torch.IntTensor if isinstance(val, int) else torch.Tensor
+        self.__setattr__(name, nn.Parameter(tensor_type([val]), requires_grad=False))
+
+    def _get_nn_param(self, param_name: str) -> Union[int, float]:
+        r"""
+        Helper function to standardize setting parameters in the \p Module.  These parameters will
+        be saved even after a saving of the state dictionary.
+        """
+        param_val = self.__getattr__(param_name)
+        # noinspection PyUnresolvedReferences
+        param_type = int if isinstance(param_val, torch.IntTensor) else float
+        return param_type(param_val[0])
+
+    @property
+    def _eps(self) -> float:
+        r""" Accessor for training loss function parameter :math:`\alpha` """
+        return self._get_nn_param("_epsilon")
+
+    @_eps.setter
+    def _eps(self, val: float) -> None:
+        r""" MUTATOR for training loss parameter :math:`\alpha` """
+        self._set_nn_param("_epsilon", val)
+
     @property
     def d_in(self) -> int:
         r""" Number of input layers input into the agent's """
@@ -323,6 +355,7 @@ class DeepQAgent(Agent, nn.Module):
         eps_range = np.linspace(self._EPS_START, self._EPS_END, num=self._M, endpoint=True)
         # Decrement epsilon with each step
         for episode, self._eps in zip(range(1, self._M + 1), eps_range):
+            logging.debug("Episode %d: alpha = %.6f", episode, self._eps)
             # noinspection PyProtectedMember
             t = ReplayStateTuple(s=copy.deepcopy(s_0),
                                  base_tensor=DeepQAgent._build_base_tensor(s_0.board, self.d_in))
@@ -425,10 +458,11 @@ class DeepQAgent(Agent, nn.Module):
 
             cur = DeepQAgent(game.board, cur_col, game.state, disable_import=True)
             utils.load_module(cur, temp_back_up)
+            cur._make_rand_move_prob = cur._eps
+
             prev = DeepQAgent(game.board, prev_col, game.state, disable_import=True)
             utils.load_module(prev, DeepQAgent._TRAIN_BEST_MODEL)
-
-            cur._make_rand_move_prob = prev._make_rand_move_prob = max(0.05, self._eps / 2)
+            prev._make_rand_move_prob = prev._eps
 
             winner = game.two_agent_automated(cur, prev, wait_time=0,
                                               max_num_moves=4000, display=False)
