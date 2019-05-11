@@ -38,6 +38,9 @@ from .state import State
 IS_CUDA = torch.cuda.is_available()
 # noinspection PyUnresolvedReferences
 TensorDType = torch.float32
+if IS_CUDA:
+    device = torch.device('cuda:0')
+    torch.set_default_tensor_type(torch.cuda.FloatTensor)
 ActCls = nn.ReLU
 
 
