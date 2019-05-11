@@ -34,12 +34,11 @@ from .player import Player
 from .state import State
 from .utils import EXPORT_DIR
 
-# noinspection PyUnresolvedReferences
 IS_CUDA = torch.cuda.is_available()
-# noinspection PyUnresolvedReferences
 TensorDType = torch.float32
 if IS_CUDA:
     device = torch.device('cuda:0')
+    # noinspection PyUnresolvedReferences
     torch.set_default_tensor_type(torch.cuda.FloatTensor)
 ActCls = nn.ReLU
 
@@ -223,7 +222,7 @@ class DeepQAgent(Agent, nn.Module):
     _NUM_RES_BLOCKS = 3
 
     # Training parameters
-    _M = 100000
+    _M = 1000
     _T = 1500  # Maximum number of moves for a state
     _EPS_START = 0.5
     _gamma = 0.98
@@ -236,6 +235,7 @@ class DeepQAgent(Agent, nn.Module):
 
     _CHECKPOINT_EPISODE_FREQUENCY = 1
     _NUM_HEAD_TO_HEAD_GAMES = 101
+    # _NUM_HEAD_TO_HEAD_GAMES = 5
     _TRAIN_BEST_MODEL = EXPORT_DIR / "_checkpoint_best_model.pth"
 
     TERMINAL_REWARDS = (_LOSS_REWARD, _WIN_REWARD, _INVALID_MOVE_REWARD)
@@ -251,19 +251,20 @@ class DeepQAgent(Agent, nn.Module):
 
     _EXPORTED_MODEL = EXPORT_DIR / "final_deep_q.pth"
 
-    def __init__(self, brd: Board, plyr: Player, other: Player, eps_end: float = 1e-4,
+    def __init__(self, brd: Board, plyr: Player, state: State, eps_end: float = 1e-4,
                  disable_import: bool = False):
         r"""
         :param brd: Game board
         :param plyr: Player who will be controlled by the agent.
-        :param other: Other player, i.e., the one not controlled by this object
+        :param disable_import: Disable importing of an agent from disk
         """
-        if plyr.color == other.color: raise ValueError("Two player colors cannot match")
+        # if plyr.color == other.color: raise ValueError("Two player colors cannot match")
 
         nn.Module.__init__(self)
         Agent.__init__(self, plyr)
 
-        self._other = other
+        self._state = state
+        # self._other = other
         self._brd = brd
         # Layer 0 to d-1: 1 if piece of i^th rank is present, otherwise 0
         # Layer d: 1 for any piece of unknown rank (not used)
@@ -271,6 +272,7 @@ class DeepQAgent(Agent, nn.Module):
         # Layer d+2: 1 for which player's turn is next, 0 otherwise
         self._d_in = 2 * Rank.count() + 2
 
+        self._eps = self._EPS_START
         self._EPS_END = eps_end
 
         # Maximum Size of the Policy Set
@@ -280,6 +282,9 @@ class DeepQAgent(Agent, nn.Module):
 
         # Tensor used as the basis for move tensors
         self._base_in = DeepQAgent._build_base_tensor(self._brd, self.d_in)
+
+        # Add feature for making a random move with some probability
+        self._make_rand_move_prob = None
 
         self._construct_network()
         self._replay = None
@@ -310,8 +315,6 @@ class DeepQAgent(Agent, nn.Module):
             utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
         else:
             utils.save_module(self, DeepQAgent._TRAIN_BEST_MODEL)
-
-        self._compare_head_to_head(0, s_0)
 
         self._replay = ReplayMemory()
         optim = torch.optim.Adam(self.parameters(), lr=self._lr)
@@ -368,7 +371,8 @@ class DeepQAgent(Agent, nn.Module):
                 if j.s.next_player.move_set.is_empty():
                     y_j = DeepQAgent._WIN_REWARD
                 else:
-                    # self._punish_invalid_move(j, optim)
+                    if episode < 10:
+                        self._punish_invalid_move(j, optim)
                     # ToDo Need to fix how board state measured since player changed after move
                     _, _, y_j_1_val, _ = self._get_state_move(j, null_policy=True)
                     y_j = y_j - self._gamma * y_j_1_val
@@ -407,22 +411,24 @@ class DeepQAgent(Agent, nn.Module):
             else:
                 cur_col, prev_col = game.blue, game.red
 
-            cur = DeepQAgent(game.board, cur_col, prev_col, disable_import=True)
+            cur = DeepQAgent(game.board, cur_col, game.state, disable_import=True)
             utils.save_module(cur, temp_back_up)
-            prev = DeepQAgent(game.board, prev_col, cur_col, disable_import=True)
+            prev = DeepQAgent(game.board, prev_col, game.state, disable_import=True)
             utils.save_module(prev, DeepQAgent._TRAIN_BEST_MODEL)
 
+            cur._make_rand_move_prob = prev._make_rand_move_prob = max(0.05, self._eps / 2)
+
             winner = game.two_agent_automated(cur, prev, wait_time=0,
-                                              max_num_moves=1000, display=False)
+                                              max_num_moves=4000, display=False)
             if winner == cur.color:
                 num_wins += 1
             elif winner is None:
                 max_move += 1
 
         win_freq = num_wins / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES
-        logging.debug("Episode %d: Head to head win frequency %.3f", win_freq)
+        logging.debug("Episode %d: Head to head win frequency %.3f", episode, win_freq)
         max_move_freq = max_move / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES
-        logging.debug("Episode %d: Games halted due to max moves frequency %.3f", max_move_freq)
+        logging.debug("Episode %d: Halted due to max moves frequency %.3f", episode, max_move_freq)
 
         if 0.5 < num_wins / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES:
             logging.debug("Head to Head: Backing up new best model")
@@ -472,16 +478,16 @@ class DeepQAgent(Agent, nn.Module):
         output_node = int(torch.argmax(policy))
         move = self._convert_output_node_to_move(output_node, state_tuple.s.next_player,
                                                  state_tuple.s.other_player)
-        # return output_node, move
+
         max_tensor, _ = policy.max(dim=1, keepdim=True)
         return output_node, policy, max_tensor, move
 
-    def _build_blocked_move_set(self, state_tuple: ReplayStateTuple) -> List[int]:
+    def _build_invalid_move_set(self, state_tuple: ReplayStateTuple) -> List[int]:
         r"""
-        Constructs the list of output nodes that are blocked from moving
+        Constructs the list of output nodes that do not represent valid moves in the specified state
 
         :param state_tuple: State tuple to be used
-        :return: List of blocked nodes
+        :return: List of invalid move nodes
         """
         valid = {self._get_output_node_from_move(m) for m in state_tuple.s.next_player.move_set}
         valid -= state_tuple.s.get_cyclic_move()
@@ -496,7 +502,7 @@ class DeepQAgent(Agent, nn.Module):
         :param clone: If True, do not perform null in place
         :return: Updated policy tensor with blocked nodes
         """
-        blocked_nodes = self._build_blocked_move_set(state_tuple)
+        blocked_nodes = self._build_invalid_move_set(state_tuple)
         if clone:
             policy = policy.clone()
         policy[:, blocked_nodes] = DeepQAgent._LOSS_REWARD
@@ -617,24 +623,34 @@ class DeepQAgent(Agent, nn.Module):
         Select the next move to be played.
         :return: Move to be performed
         """
-        x = self._build_network_input(self._plyr, self._other)
-        # Gradients no needed since will not be push backwards
-        # noinspection PyUnresolvedReferences
-        with torch.no_grad():
-            policy = self.forward(x)
-        while True:
-            out_node = torch.argmax(policy, dim=1)
-            try:
-                m = self._get_move_from_output_node(out_node, self._plyr, self._other)
-                # As a safety always ensure selected move is valid
-                if m in self._plyr.move_set:
-                    return m
-                logging.warning("Tried to select move %s to %s for color %s but move is invalid",
-                                m.orig, m.new, self.color)
-            except (ValueError, AssertionError):
-                logging.warning("Runtime exception with out_node: %d" % out_node)
-            # Zero out that move and select a different one
-            policy[:, out_node] = -torch.ones((policy.size(0)), dtype=TensorDType)
+        if self._make_rand_move_prob is not None and random.random() < self._make_rand_move_prob:
+            return self._plyr.get_random_move()
+
+        x = DeepQAgent._build_input_tensor(self._base_in, self._state.pieces(),
+                                           self._state.other_player)
+
+        state_tuple = ReplayStateTuple(self._state)
+        policy = self._null_blocked_moves(state_tuple, self.forward(x), clone=True)
+        output_node = int(torch.argmax(policy))
+        return self._convert_output_node_to_move(output_node, self._plyr, self._state.other_player)
+        # x = self._build_network_input(self._plyr, self._other)
+        # # Gradients no needed since will not be push backwards
+        # # noinspection PyUnresolvedReferences
+        # with torch.no_grad():
+        #     policy = self.forward(x)
+        # while True:
+        #     out_node = torch.argmax(policy, dim=1)
+        #     try:
+        #         m = self._get_move_from_output_node(out_node, self._plyr, self._other)
+        #         # As a safety always ensure selected move is valid
+        #         if m in self._plyr.move_set:
+        #             return m
+        #         logging.warning("Tried to select move %s to %s for color %s but move is invalid",
+        #                         m.orig, m.new, self.color)
+        #     except (ValueError, AssertionError):
+        #         logging.warning("Runtime exception with out_node: %d" % out_node)
+        #     # Zero out that move and select a different one
+        #     policy[:, out_node] = -torch.ones((policy.size(0)), dtype=TensorDType)
 
     # def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     #     r"""
