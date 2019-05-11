@@ -20,6 +20,7 @@ from .agent import Agent
 from .board import Board
 from .location import Location
 from .move import Move
+from .piece import Color
 from .player import Player
 from .printer import Printer
 from .state import State
@@ -28,19 +29,26 @@ from .utils import PathOrStr
 
 class Game:
     r""" Encapsulates an active Stratego game """
-    def __init__(self, board_path: Union[Path, str], state_path: Union[Path, str],
-                 visibility: Printer.Visibility):
+    def __init__(self, board_path: Union[Path, str, Board], state_path: Union[Path, str, State],
+                 visibility: Optional[Printer.Visibility]):
         r"""
         :param board_path: Path to the file specifying the board
         :param state_path: Path to the file specifying the game state
         :param visibility: Specifies whose pieces are visible
         """
-        if isinstance(state_path, str): state_path = Path(state_path)
-
-        self._brd = Board.importer(board_path)
+        if isinstance(board_path, Board):
+            self._brd = board_path
+        else:
+            self._brd = Board.importer(board_path)
         Move.set_board(self._brd)
 
-        self._state = State.importer(state_path, self._brd, visibility)
+        if isinstance(state_path, State):
+            self._state = state_path
+        else:
+            if visibility is None:
+                raise ValueError("visibility cannot be None if reading state from file")
+            if isinstance(state_path, str): state_path = Path(state_path)
+            self._state = State.importer(state_path, self._brd, visibility)
 
     @property
     def red(self) -> Player:
@@ -111,7 +119,7 @@ class Game:
 
     def two_agent_automated(self, a1: Agent, a2: Agent, wait_time: float = 0,
                             display: bool = False, max_num_moves: Optional[int] = None,
-                            moves_output_file: Optional[PathOrStr] = None) -> None:
+                            moves_output_file: Optional[PathOrStr] = None) -> Optional[Color]:
         r"""
         Simple interface to play
 
@@ -161,8 +169,10 @@ class Game:
             if display:
                 print("Game over.  Player", other.color.name, "won")
                 print("Number of Moves:", num_moves)
+            return self._state.other_player.color
         elif num_moves == max_num_moves:
             print("Maximum number of moves %d reached. Exiting." % max_num_moves)
+        return None
 
     def _execute_move_file(self, moves_file: PathOrStr, display_after_move: bool = False) -> None:
         r"""
