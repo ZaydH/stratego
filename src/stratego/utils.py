@@ -39,7 +39,7 @@ def setup_logger(quiet_mode: bool = False, filename: PathOrStr = "test.log",
 
     # Matplotlib clutters the logger so change its log level
     # noinspection PyProtectedMember
-    # matplotlib._log.setLevel(logging.INFO)  # pylint: disable=protected-access
+    # matplotlib._log.setLevel(logging.WARNING)  # pylint: disable=protected-access
 
     logging.debug("******************* New Run Beginning *****************")
     logging.debug("CUDA: %s", "ENABLED" if IS_CUDA else "Disabled")
