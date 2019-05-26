@@ -204,9 +204,10 @@ class ReplayMemory:
         self._next += 1
         if self._next == self._N: self._next = 0
 
-    def get_random(self) -> ReplayStateTuple:
+    def get_random(self, batch_size=32) -> ReplayStateTuple:
         r""" Select a random element from the replay memory """
-        return random.choice(self._buf)
+        with_replacement = len(self._buf) < batch_size
+        return np.random.choice(self._buf, size=batch_size, replace=with_replacement)
 
 
 class DeepQAgent(Agent, nn.Module):
@@ -425,22 +426,24 @@ class DeepQAgent(Agent, nn.Module):
             else: t.r = self._NON_TERMINAL_MOVE_REWARD
             self._replay.add(t)
 
-            j = self._replay.get_random()
-            y_j = j.r
-            if not j.is_terminal():
-                j.s.update(j.a)
-                if j.s.next_player.move_set.is_empty():
-                    y_j = DeepQAgent._WIN_REWARD
-                else:
-                    # if episode < 10:
-                    #     self._punish_invalid_move(j)
-                    # ToDo Need to fix how board state measured since player changed after move
-                    _, _, y_j_1_val, _ = self._get_state_move(j, null_policy=True)
-                    y_j = y_j - self._gamma * y_j_1_val
-                    # ToDo may need to rollback multiple moves
-                j.s.rollback()
-
-            q_j = self._get_action_output_score(j)
+            j_arr = self._replay.get_random()
+            # Mini-batch support
+            y_j = torch.tensor([j.r for j in j_arr])
+            q_j = torch.zeros_like(y_j)
+            for idx, j in enumerate(j_arr):
+                if not j.is_terminal():
+                    j.s.update(j.a)
+                    if j.s.next_player.move_set.is_empty():
+                        y_j = DeepQAgent._WIN_REWARD
+                    else:
+                        # if episode < 10:
+                        #     self._punish_invalid_move(j)
+                        # ToDo Need to fix how board state measured since player changed after move
+                        _, _, y_j_1_val, _ = self._get_state_move(j, null_policy=True)
+                        y_j[idx] = y_j[idx] - self._gamma * y_j_1_val
+                        # ToDo may need to rollback multiple moves
+                    j.s.rollback()
+                q_j[idx] = self._get_action_output_score(j)
             loss = self._f_loss(y_j, q_j)
             self._optim.zero_grad()
             loss.backward()
