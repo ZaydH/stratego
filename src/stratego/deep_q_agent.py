@@ -22,8 +22,7 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-import torch.optim
-from torch.optim.optimizer import Optimizer
+import torch.optim as optim
 from tqdm import tqdm
 
 from . import Location, Move, utils, Game
@@ -227,11 +226,11 @@ class DeepQAgent(Agent, nn.Module):
     _T = 1500  # Maximum number of moves for a state
     _EPS_START = 0.5
     _gamma = 0.98
-    _lr = 1e-3
+    _LR_START = 0.2
     _f_loss = nn.MSELoss()
     _INVALID_MOVE_REWARD = -torch.ones((1, 1))  # Must be -1 since output is tanh
     _LOSS_REWARD = _INVALID_MOVE_REWARD
-    _NON_TERMINAL_MOVE_REWARD = torch.full_like(_INVALID_MOVE_REWARD, -0.01)
+    _NON_TERMINAL_MOVE_REWARD = torch.full_like(_INVALID_MOVE_REWARD, -0.001)
     _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
 
     _CHECKPOINT_EPISODE_FREQUENCY = 100
@@ -297,6 +296,11 @@ class DeepQAgent(Agent, nn.Module):
         # Must be last in constructor to ensure proper CUDA enabling
         if IS_CUDA: self.cuda()
 
+        self._episode = 1
+        self._optim = optim.Adam(self.parameters(), lr=DeepQAgent._LR_START)
+        self._lr_sched = optim.lr_scheduler.MultiStepLR(self._optim, milestones=[1000, 2000, 3000],
+                                                        gamma=0.1)
+
     def _set_nn_param(self, name: str, val: Union[int, float]):
         r"""
         Helper function to standardize setting parameters in the \p Module.  These parameters will
@@ -321,13 +325,23 @@ class DeepQAgent(Agent, nn.Module):
 
     @property
     def _eps(self) -> float:
-        r""" Accessor for training loss function parameter :math:`\alpha` """
+        r""" Accessor for training loss function parameter :math:`\epsilon` """
         return self._get_nn_param("_epsilon")
 
     @_eps.setter
     def _eps(self, val: float) -> None:
-        r""" MUTATOR for training loss parameter :math:`\alpha` """
+        r""" MUTATOR for training loss parameter :math:`\epsilon` """
         self._set_nn_param("_epsilon", val)
+
+    @property
+    def _episode(self) -> int:
+        r""" Accessor for the current EPISODE number """
+        return self._get_nn_param("_episode")
+
+    @_episode.setter
+    def _episode(self, val: int) -> None:
+        r""" MUTATOR for the current EPISODE number """
+        self._set_nn_param("_episode", val)
 
     @property
     def d_in(self) -> int:
@@ -351,15 +365,17 @@ class DeepQAgent(Agent, nn.Module):
             bypass_first_head_to_head = True
 
         self._replay = ReplayMemory()
-        optim = torch.optim.Adam(self.parameters(), lr=self._lr)
-        eps_range = np.linspace(self._EPS_START, self._EPS_END, num=self._M, endpoint=True)
+
+        num_rem_episodes = self._M + 1 - self._episode
+        eps_range = np.linspace(self._eps, self._EPS_END, num=num_rem_episodes, endpoint=True)
         # Decrement epsilon with each step
-        for episode, self._eps in zip(range(1, self._M + 1), eps_range):
+        for episode, self._eps in zip(range(self._episode, self._M + 1), eps_range):
             logging.debug("Episode %d: alpha = %.6f", episode, self._eps)
             # noinspection PyProtectedMember
             t = ReplayStateTuple(s=copy.deepcopy(s_0),
                                  base_tensor=DeepQAgent._build_base_tensor(s_0.board, self.d_in))
-            self._train_episode(episode, t, optim)
+            self._train_episode(episode, t)
+            self._lr_sched.step()
 
             if episode % DeepQAgent._CHECKPOINT_EPISODE_FREQUENCY == 0:
                 if bypass_first_head_to_head:
@@ -370,20 +386,18 @@ class DeepQAgent(Agent, nn.Module):
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
 
-    def _train_episode(self, episode: int, t: ReplayStateTuple, optim: Optimizer) -> None:
+    def _train_episode(self, episode: int, t: ReplayStateTuple) -> None:
         r"""
         Performs training for a single epoch
 
         :param t: Initial state tuple for the episode
-        :param optim: Optimizer
         """
         f_out = open("deep-q_train_moves.txt", "w+")
         f_out.write("# PlayerColor,StartLoc,EndLoc")
 
         num_rand_moves = 0
         logging.info("Starting episode %d of %d", episode, self._M)
-        i, progress_bar = 1, tqdm(range(self._T), total=self._T, file=sys.stdout,
-                                  disable=IS_TALAPAS)
+        progress_bar = tqdm(range(self._T), total=self._T, file=sys.stdout, disable=IS_TALAPAS)
         for i in progress_bar:
             # With probability < \epsilon, select a random action
             if not t.s.next_player.move_set.is_empty():
@@ -412,7 +426,7 @@ class DeepQAgent(Agent, nn.Module):
                     y_j = DeepQAgent._WIN_REWARD
                 else:
                     # if episode < 10:
-                    #     self._punish_invalid_move(j, optim)
+                    #     self._punish_invalid_move(j)
                     # ToDo Need to fix how board state measured since player changed after move
                     _, _, y_j_1_val, _ = self._get_state_move(j, null_policy=True)
                     y_j = y_j - self._gamma * y_j_1_val
@@ -421,9 +435,9 @@ class DeepQAgent(Agent, nn.Module):
 
             q_j = self._get_action_output_score(j)
             loss = self._f_loss(y_j, q_j)
-            optim.zero_grad()
+            self._optim.zero_grad()
             loss.backward()
-            optim.step()
+            self._optim.step()
 
             # Advance to next state
             if t.s.is_game_over():
@@ -437,7 +451,8 @@ class DeepQAgent(Agent, nn.Module):
             logging.debug("Episode %d: Winner is %s", episode, t.s.get_winner().name)
 
         logging.info("COMPLETED episode %d of %d", episode, self._M)
-        logging.debug("Episode %d: Number of epochs = %d", episode, i)
+        # noinspection PyUnboundLocalVariable
+        logging.debug("Episode %d: Number of Total Moves = %d", episode, i)
         logging.debug("Episode %d: Number of Random Moves = %d", episode, num_rand_moves)
         logging.debug("Episode %d: Frac. Moves Random = %.4f", episode, num_rand_moves / i)
 
@@ -485,19 +500,18 @@ class DeepQAgent(Agent, nn.Module):
             utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
         logging.debug("COMPLETED: %s", msg)
 
-    def _punish_invalid_move(self, state_tuple: ReplayStateTuple, optim: Optimizer) -> None:
+    def _punish_invalid_move(self, state_tuple: ReplayStateTuple) -> None:
         r"""
         Updates the network to punish for illegal moves
 
         :param state_tuple: State tuple to be zeroed out
-        :param optim: Optimizer
         """
         _, policy, _, _ = self._get_state_move(state_tuple)
         nulled_policy = self._null_blocked_moves(state_tuple, policy, clone=True)
         p = self._f_loss(policy, nulled_policy)
-        optim.zero_grad()
+        self._optim.zero_grad()
         p.backward()
-        optim.step()
+        self._optim.step()
 
     def _num_scout_moves(self) -> int:
         r"""
