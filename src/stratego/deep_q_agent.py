@@ -371,26 +371,26 @@ class DeepQAgent(Agent, nn.Module):
         num_rem_episodes = self._M + 1 - self._episode
         eps_range = np.linspace(self._eps, self._EPS_END, num=num_rem_episodes, endpoint=True)
         # Decrement epsilon with each step
-        for episode, self._eps in zip(range(self._episode, self._M + 1), eps_range):
-            logging.debug("Episode %d: alpha = %.6f", episode, self._eps)
+        for self._episode, self._eps in zip(range(self._episode, self._M + 1), eps_range):
+            logging.debug("Episode %d: alpha = %.6f", self._episode, self._eps)
             # noinspection PyProtectedMember
             t = ReplayStateTuple(s=copy.deepcopy(s_0),
                                  base_tensor=DeepQAgent._build_base_tensor(s_0.board, self.d_in))
-            self._train_episode(episode, t)
+            self._train_episode(t)
             # noinspection PyArgumentList
             self._lr_sched.step()
 
-            if episode % DeepQAgent._CHECKPOINT_EPISODE_FREQUENCY == 0:
+            if self._episode % DeepQAgent._CHECKPOINT_EPISODE_FREQUENCY == 0:
                 if bypass_first_head_to_head:
                     utils.save_module(self, DeepQAgent._TRAIN_BEST_MODEL)
                     bypass_first_head_to_head = False
                 else:
-                    self._compare_head_to_head(episode, s_0)
+                    self._compare_head_to_head(s_0)
 
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
 
-    def _train_episode(self, episode: int, t: ReplayStateTuple) -> None:
+    def _train_episode(self, t: ReplayStateTuple) -> None:
         r"""
         Performs training for a single epoch
 
@@ -400,7 +400,7 @@ class DeepQAgent(Agent, nn.Module):
         f_out.write("# PlayerColor,StartLoc,EndLoc")
 
         num_rand_moves = 0
-        logging.info("Starting episode %d of %d", episode, self._M)
+        logging.info("Starting episode %d of %d", self._episode, self._M)
         progress_bar = tqdm(range(self._T), total=self._T, file=sys.stdout, disable=IS_TALAPAS)
         for i in progress_bar:
             # With probability < \epsilon, select a random action
@@ -455,20 +455,20 @@ class DeepQAgent(Agent, nn.Module):
 
         # Print the color of the winning player
         if t.s.is_game_over():
-            logging.debug("Episode %d: Winner is %s", episode, t.s.get_winner().name)
+            logging.debug("Episode %d: Winner is %s", self.episode, t.s.get_winner().name)
 
-        logging.info("COMPLETED episode %d of %d", episode, self._M)
+        logging.info("COMPLETED episode %d of %d", self._episode, self._M)
         # noinspection PyUnboundLocalVariable
-        logging.debug("Episode %d: Number of Total Moves = %d", episode, i)
-        logging.debug("Episode %d: Number of Random Moves = %d", episode, num_rand_moves)
-        logging.debug("Episode %d: Frac. Moves Random = %.4f", episode, num_rand_moves / i)
+        logging.debug("Episode %d: Number of Total Moves = %d", self._episode, i)
+        logging.debug("Episode %d: Number of Random Moves = %d", self._episode, num_rand_moves)
+        logging.debug("Episode %d: Frac. Moves Random = %.4f", self._episode, num_rand_moves / i)
 
-    def _compare_head_to_head(self, episode: int, s0: State):
+    def _compare_head_to_head(self, s0: State):
         r""" Test if the current agent is better head to head than previous one """
         temp_back_up = EXPORT_DIR / "_temp_train_backup.pth"
         utils.save_module(self, temp_back_up)
 
-        msg = "Head to head agent competition for episode %d" % episode
+        msg = "Head to head agent competition for episode %d" % self._episode
         logging.debug("Starting: %s", msg)
 
         max_move = num_wins = 0
@@ -495,9 +495,9 @@ class DeepQAgent(Agent, nn.Module):
                 max_move += 1
 
         win_freq = num_wins / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES
-        logging.debug("Episode %d: Head to head win frequency %.3f", episode, win_freq)
-        max_move_freq = max_move / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES
-        logging.debug("Episode %d: Halted due to max moves frequency %.3f", episode, max_move_freq)
+        logging.debug("Episode %d: Head to head win frequency %.3f", self._episode, win_freq)
+        f_max = max_move / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES
+        logging.debug("Episode %d: Halted due to max moves frequency %.3f", self._episode, f_max)
 
         if 0.5 < num_wins / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES:
             logging.debug("Head to Head: Backing up new best model")
