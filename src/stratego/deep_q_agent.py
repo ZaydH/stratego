@@ -32,7 +32,7 @@ from .board import Board
 from .piece import Piece, Rank
 from .player import Player
 from .state import State
-from .utils import EXPORT_DIR
+from .utils import EXPORT_DIR, IS_TALAPAS
 
 IS_CUDA = torch.cuda.is_available()
 TensorDType = torch.float32
@@ -231,7 +231,7 @@ class DeepQAgent(Agent, nn.Module):
     _f_loss = nn.MSELoss()
     _INVALID_MOVE_REWARD = -torch.ones((1, 1))  # Must be -1 since output is tanh
     _LOSS_REWARD = _INVALID_MOVE_REWARD
-    _NO_REWARD = torch.full_like(_INVALID_MOVE_REWARD, -0.1)
+    _NON_TERMINAL_MOVE_REWARD = torch.full_like(_INVALID_MOVE_REWARD, -0.01)
     _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
 
     _CHECKPOINT_EPISODE_FREQUENCY = 100
@@ -382,7 +382,8 @@ class DeepQAgent(Agent, nn.Module):
 
         num_rand_moves = 0
         logging.info("Starting episode %d of %d", episode, self._M)
-        i, progress_bar = 1, tqdm(range(self._T), total=self._T, file=sys.stdout)
+        i, progress_bar = 1, tqdm(range(self._T), total=self._T, file=sys.stdout,
+                                  disable=IS_TALAPAS)
         for i in progress_bar:
             # With probability < \epsilon, select a random action
             if not t.s.next_player.move_set.is_empty():
@@ -400,7 +401,7 @@ class DeepQAgent(Agent, nn.Module):
             # Player about to win
             elif t.a.is_attack() and t.a.attacked.rank == Rank.flag(): t.r = self._WIN_REWARD
             # Game not over yet
-            else: t.r = self._NO_REWARD
+            else: t.r = self._NON_TERMINAL_MOVE_REWARD
             self._replay.add(t)
 
             j = self._replay.get_random()
@@ -432,9 +433,8 @@ class DeepQAgent(Agent, nn.Module):
         f_out.close()
 
         # Print the color of the winning player
-        winner = t.s.get_winner()
-        if winner is not None:
-            logging.debug("Episode %d: Winner is %s", episode, winner.name)
+        if t.s.is_game_over():
+            logging.debug("Episode %d: Winner is %s", episode, t.s.get_winner().name)
 
         logging.info("COMPLETED episode %d of %d", episode, self._M)
         logging.debug("Episode %d: Number of epochs = %d", episode, i)

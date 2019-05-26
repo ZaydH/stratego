@@ -1,4 +1,6 @@
 import logging
+import re
+import socket
 import sys
 from pathlib import Path
 from typing import Union
@@ -10,6 +12,20 @@ PathOrStr = Union[Path, str]
 IS_CUDA = True if torch.cuda.is_available() else False
 
 EXPORT_DIR = Path("export")
+
+
+def _check_is_talapas() -> bool:
+    r""" Returns \p True if running on talapas """
+    host = socket.gethostname().lower()
+    if "talapas" in host: return True
+    if re.match(r"^n\d{3}$", host): return True
+
+    num_string = r"(\d{3}|\d{3}-\d{3})"
+    if re.match(f"n\\[{num_string}(,{num_string})*\\]", host): return True
+    return False
+
+
+IS_TALAPAS = _check_is_talapas()
 
 
 def setup_logger(quiet_mode: bool = False, filename: PathOrStr = "test.log",
@@ -43,6 +59,7 @@ def setup_logger(quiet_mode: bool = False, filename: PathOrStr = "test.log",
 
     logging.debug("******************* New Run Beginning *****************")
     logging.debug("CUDA: %s", "ENABLED" if IS_CUDA else "Disabled")
+    logging.info("Is Talapas: %s", "TRUE" if IS_TALAPAS else "False")
 
 
 def save_module(module: nn.Module, filepath: Union[Path, str]) -> None:
