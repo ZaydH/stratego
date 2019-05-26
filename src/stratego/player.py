@@ -349,6 +349,19 @@ class Player:
         return res
 
     def get_random_move(self) -> Move:
-        r""" Selects and returns a move uniformly at random from the set of available moves """
-        values = list(self.move_set.avail.values())
-        return random.choice(values)
+        r"""
+        Selects a piece to move uniformly at random.  Then select the move from that piece's
+        avaiable moves uniformly at random.
+        :return: Randomly selected move
+        """
+        move_dict = dict()
+        keys = []
+        for m in self.move_set.avail.values():
+            try:
+                move_dict[m.piece].append(m)
+            except KeyError:
+                keys.append(m.piece)
+                move_dict[m.piece] = [m]
+
+        key = random.choice(keys)
+        return random.choice(move_dict[key])
