@@ -1,3 +1,5 @@
+import sys
+
 from stratego import Game
 from stratego.deep_q_agent import DeepQAgent
 # noinspection PyUnresolvedReferences
@@ -71,8 +73,10 @@ def _main():
     # _main_hard_coded()
     # _main_random()
     # _main_make_moves("moves.txt")
-    # _main_deep_q_vs_human()
-    _main_train()
+    if len(sys.argv) > 1:
+        _main_deep_q_vs_human()
+    else:
+        _main_train()
 
 
 if __name__ == "__main__":
