@@ -204,10 +204,11 @@ class ReplayMemory:
         self._next += 1
         if self._next == self._N: self._next = 0
 
-    def get_random(self, batch_size=32) -> ReplayStateTuple:
+    def get_random(self, batch_size=32) -> List[ReplayStateTuple]:
         r""" Select a random element from the replay memory """
-        with_replacement = len(self._buf) < batch_size
-        return np.random.choice(self._buf, size=batch_size, replace=with_replacement)
+        if len(self._buf) < batch_size:
+            return self._buf
+        return np.random.choice(self._buf, size=batch_size, replace=False)
 
 
 class DeepQAgent(Agent, nn.Module):
