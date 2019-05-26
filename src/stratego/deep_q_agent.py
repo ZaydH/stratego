@@ -455,7 +455,7 @@ class DeepQAgent(Agent, nn.Module):
 
         # Print the color of the winning player
         if t.s.is_game_over():
-            logging.debug("Episode %d: Winner is %s", self.episode, t.s.get_winner().name)
+            logging.debug("Episode %d: Winner is %s", self._episode, t.s.get_winner().name)
 
         logging.info("COMPLETED episode %d of %d", self._episode, self._M)
         # noinspection PyUnboundLocalVariable
