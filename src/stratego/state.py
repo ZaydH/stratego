@@ -154,14 +154,14 @@ class State:
 
     def get_cyclic_move(self) -> Set[Move]:
         r""" Gets the move (if any) blocked because it would be cyclic """
-        # if len(self._stack) >= 4 and self._stack[-2] == self._stack[-4]:
-        #     return {self._stack[-2]}
         if self._is_training:
             end = -min(13, len(self._stack))
             # noinspection PyTypeChecker
             invalid_moves = set(self._stack[-2:end:-2])
             return invalid_moves
-        return {self._stack[-2]}
+        if len(self._stack) >= 4 and self._stack[-2] == self._stack[-4]:
+            return {self._stack[-2]}
+        return set()
 
     @staticmethod
     def _print_template_file(file_path: Union[Path, str]) -> None:
