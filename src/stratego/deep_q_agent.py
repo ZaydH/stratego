@@ -435,7 +435,7 @@ class DeepQAgent(Agent, nn.Module):
                 if not j.is_terminal():
                     j.s.update(j.a)
                     if j.s.next_player.move_set.is_empty():
-                        y_j = DeepQAgent._WIN_REWARD
+                        y_j[idx] = DeepQAgent._WIN_REWARD
                     else:
                         # if episode < 10:
                         #     self._punish_invalid_move(j)
