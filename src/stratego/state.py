@@ -31,6 +31,18 @@ class State:
         self._printer = None  # type: Printer
         self._stack = MoveStack()
 
+        self._is_training = False
+
+    @property
+    def is_training(self) -> bool:
+        r""" Return \p True if in training mode """
+        return self._is_training
+
+    @is_training.setter
+    def is_training(self, val: bool) -> None:
+        r""" Update the training value """
+        self._is_training = val
+
     @property
     def next_color(self) -> Color:
         r""" Accessor for the COLOR of the player whose turn is next """
@@ -142,9 +154,16 @@ class State:
 
     def get_cyclic_move(self) -> Set[Move]:
         r""" Gets the move (if any) blocked because it would be cyclic """
-        if len(self._stack) >= 4 and self._stack[-2] == self._stack[-4]:
-            return {self._stack[-2]}
-        return set()
+        # if len(self._stack) >= 4 and self._stack[-2] == self._stack[-4]:
+        #     return {self._stack[-2]}
+        invalid_moves = set()
+        if self._is_training:
+            for i in range(-2, -min(13, len(self._stack)), -2):
+                invalid_moves.add(self._stack[i])
+        else:
+            if len(self._stack) >= 4 and self._stack[-4] == self._stack[-2]:
+                invalid_moves.add(self._stack[-2])
+        return invalid_moves
 
     @staticmethod
     def _print_template_file(file_path: Union[Path, str]) -> None:

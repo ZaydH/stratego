@@ -357,6 +357,8 @@ class DeepQAgent(Agent, nn.Module):
         r""" Train the agent """
         Move.DISABLE_ASSERT_CHECKS = True
 
+        s_0.is_training = True
+
         # If a trained model exists, load it. Otherwise, backup the default model
         if DeepQAgent._TRAIN_BEST_MODEL.exists():
             utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
@@ -375,6 +377,7 @@ class DeepQAgent(Agent, nn.Module):
             t = ReplayStateTuple(s=copy.deepcopy(s_0),
                                  base_tensor=DeepQAgent._build_base_tensor(s_0.board, self.d_in))
             self._train_episode(episode, t)
+            # noinspection PyArgumentList
             self._lr_sched.step()
 
             if episode % DeepQAgent._CHECKPOINT_EPISODE_FREQUENCY == 0:
@@ -383,6 +386,7 @@ class DeepQAgent(Agent, nn.Module):
                     bypass_first_head_to_head = False
                 else:
                     self._compare_head_to_head(episode, s_0)
+
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
 
