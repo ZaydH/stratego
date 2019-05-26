@@ -437,8 +437,6 @@ class DeepQAgent(Agent, nn.Module):
                     if j.s.next_player.move_set.is_empty():
                         y_j[idx] = DeepQAgent._WIN_REWARD
                     else:
-                        # if episode < 10:
-                        #     self._punish_invalid_move(j)
                         # ToDo Need to fix how board state measured since player changed after move
                         _, _, y_j_1_val, _ = self._get_state_move(j, null_policy=True)
                         y_j[idx] = y_j[idx] - self._gamma * y_j_1_val

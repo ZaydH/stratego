@@ -202,7 +202,7 @@ class State:
         # Check for illegal cycling
         mv_plyr = self.get_player(move.piece.color)
         if not mv_plyr.has_move(move.piece, move.new):
-            raise ValueError("Specified move appears does not appear to be known")
+            raise ValueError("Specified move does not appear to be known")
 
         # Delete the piece being moved regardless of whether or not move is an attack
         self._printer.delete_piece(move.orig)
