@@ -156,14 +156,12 @@ class State:
         r""" Gets the move (if any) blocked because it would be cyclic """
         # if len(self._stack) >= 4 and self._stack[-2] == self._stack[-4]:
         #     return {self._stack[-2]}
-        invalid_moves = set()
         if self._is_training:
-            for i in range(-2, -min(13, len(self._stack)), -2):
-                invalid_moves.add(self._stack[i])
-        else:
-            if len(self._stack) >= 4 and self._stack[-4] == self._stack[-2]:
-                invalid_moves.add(self._stack[-2])
-        return invalid_moves
+            end = -min(13, len(self._stack))
+            # noinspection PyTypeChecker
+            invalid_moves = set(self._stack[-2:end:-2])
+            return invalid_moves
+        return {self._stack[-2]}
 
     @staticmethod
     def _print_template_file(file_path: Union[Path, str]) -> None:
@@ -336,7 +334,7 @@ class State:
         # Last move attacked flag
         if not self._stack.is_empty() and self._stack.top().is_game_over(): return True
         # Current player has no moves
-        if self.next_player.move_set.is_empty(): return True
+        if self.next_player.move_set.is_empty(self.get_cyclic_move()): return True
         return False
 
     def get_winner(self) -> Optional[Color]:

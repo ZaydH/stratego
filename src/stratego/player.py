@@ -215,8 +215,11 @@ class MoveSet:
     def _make_move_key(orig: Location, new: Location):
         return orig, new
 
-    def is_empty(self) -> bool:
+    def is_empty(self, cyclic_moves: Set[Move] = None) -> bool:
         r""" Returns \p True if the \p MoveSet is empty """
+        if cyclic_moves is not None:
+            avail = set(self.avail.values()) - cyclic_moves
+            return len(avail) == 0
         return not bool(self.avail)
 
     def __iter__(self):
