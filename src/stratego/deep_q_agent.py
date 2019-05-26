@@ -411,6 +411,9 @@ class DeepQAgent(Agent, nn.Module):
                 # Select (epsilon-)greedy action
                 else:
                     output_node, _, _, t.a = self._get_state_move(t, null_policy=True)
+                    if t.a.piece is None and self._episode <= 20:
+                        t.a = t.s.next_player.get_random_move()
+                        num_rand_moves += 1
                 f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
                 f_out.flush()
 
