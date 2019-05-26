@@ -336,12 +336,12 @@ class DeepQAgent(Agent, nn.Module):
     @property
     def _episode(self) -> int:
         r""" Accessor for the current EPISODE number """
-        return self._get_nn_param("_episode")
+        return self._get_nn_param("_episode_param")
 
     @_episode.setter
     def _episode(self, val: int) -> None:
         r""" MUTATOR for the current EPISODE number """
-        self._set_nn_param("_episode", val)
+        self._set_nn_param("_episode_param", val)
 
     @property
     def d_in(self) -> int:
