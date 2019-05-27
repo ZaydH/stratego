@@ -237,14 +237,15 @@ class DeepQAgent(Agent, nn.Module):
     _f_loss = nn.MSELoss()
     _LOSS_REWARD = -torch.ones((1, 2))  # Must be -1 since output is tanh
     _INVALID_MOVE_REWARD = _LOSS_REWARD
-    _NON_TERMINAL_MOVE_REWARD = torch.full_like(_LOSS_REWARD, -0.001)
+    _NON_TERMINAL_MOVE_REWARD = torch.full_like(_LOSS_REWARD, -1E-4)
     _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
 
     TERMINAL_REWARDS = (_LOSS_REWARD, _WIN_REWARD, _INVALID_MOVE_REWARD)
 
     _INVALID_FILL_VAL = 10 * float(_INVALID_MOVE_REWARD[0, 0])
 
-    _CHECKPOINT_EPISODE_FREQUENCY = 100
+    # _CHECKPOINT_EPISODE_FREQUENCY = 100
+    _CHECKPOINT_EPISODE_FREQUENCY = 10
     _NUM_HEAD_TO_HEAD_GAMES = 101
     # _NUM_HEAD_TO_HEAD_GAMES = 5
     _TRAIN_BEST_MODEL = EXPORT_DIR / "_checkpoint_best_model.pth"
