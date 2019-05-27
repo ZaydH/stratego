@@ -145,7 +145,7 @@ def test_base_input_builder():
 # noinspection PyTypeChecker,PyUnresolvedReferences,PyProtectedMember
 def test_input_builder():
     r""" Verify that the input builder script works as expected """
-    agent = _make_deep_q_agent()
+    agent = _make_deep_q_agent(state_file=STATES_PATH / "deep_q_verify.txt")
 
     plyrs = [(agent._state.next_player, agent._state.other_player),
              (agent._state.other_player, agent._state.next_player)]
@@ -161,9 +161,9 @@ def test_input_builder():
 
         # Verify the layer count segregation
         plyr_sum = torch.sum(t_in[:, :Rank.count()])
-        assert plyr_sum == len(list(lyr.pieces())), "Verify the piece count for the player"
+        assert int(plyr_sum) == len(list(plyr.pieces())), "Verify the piece count for the player"
         other_sum = torch.sum(t_in[:, Rank.count():2*Rank.count()])
-        assert other_sum == len(list(other.pieces())), "Verify the piece count for the player"
+        assert int(other_sum) == len(list(other.pieces())), "Verify the piece count for the player"
 
         # noinspection PyUnresolvedReferences
         def _get_in_layer(layer_num: int) -> torch.Tensor:
@@ -171,14 +171,6 @@ def test_input_builder():
 
         assert plyr.color != other.color
         # assert DeepQAgent._RED_PIECE_VAL != DeepQAgent._BLUE_PIECE_VAL, "Sanity check"
-
-        # assert the number of pieces is correct
-        num_r = len(Rank.get_all())
-        for _p in [plyr, other]:
-            ofs = 0 if _p == plyr else 1
-            num_pieces = len(list(_p.pieces()))
-            found_cnt = [t_in[0, i] == DeepQAgent._PIECE_VAL for i in range(ofs, 2 * num_r, 2)]
-            assert sum([x.sum() for x in found_cnt]) == num_pieces
 
         # Ensure no pieces are unknown (may need to change later)
         assert torch.sum(_get_in_layer(DeepQAgent._unk_rank_layer)) == 0
