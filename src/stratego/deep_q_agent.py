@@ -303,7 +303,7 @@ class DeepQAgent(Agent, nn.Module):
         # Must be last in constructor to ensure proper CUDA enabling
         if IS_CUDA: self.cuda()
 
-        self._episode = 1
+        self._episode = 0
         self._optim = optim.Adam(self.parameters(), lr=DeepQAgent._LR_START)
         self._lr_sched = optim.lr_scheduler.MultiStepLR(self._optim, milestones=[1000, 2000, 3000],
                                                         gamma=0.1)
@@ -383,16 +383,14 @@ class DeepQAgent(Agent, nn.Module):
         # If a trained model exists, load it. Otherwise, backup the default model
         if DeepQAgent._TRAIN_BEST_MODEL.exists():
             utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
-            bypass_first_head_to_head = False
-        else:
-            bypass_first_head_to_head = True
+        bypass_first_head_to_head = True
 
         self._replay = ReplayMemory()
 
-        num_rem_episodes = self._M + 1 - self._episode
+        num_rem_episodes = self._M - self._episode
         eps_range = np.linspace(self._eps, self._EPS_END, num=num_rem_episodes, endpoint=True)
         # Decrement epsilon with each step
-        for self._episode, self._eps in zip(range(self._episode, self._M + 1), eps_range):
+        for self._episode, self._eps in zip(range(self._episode+1, self._M + 1), eps_range):
             logging.debug("Episode %d: alpha = %.6f", self._episode, self._eps)
             # noinspection PyProtectedMember
             t = ReplayStateTuple(s=copy.deepcopy(s_0),
@@ -450,7 +448,7 @@ class DeepQAgent(Agent, nn.Module):
             # Mini-batch support
             reward_arr = [j.r for j in j_arr]
             y_j = torch.cat(reward_arr, dim=0)
-            q_j = torch.zeros_like(y_j)
+            q_j = torch.zeros_like(y_j, dtype=TensorDType)
             for idx, j in enumerate(j_arr):
                 if not j.is_terminal():
                     j.s.update(j.a)

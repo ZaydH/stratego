@@ -352,8 +352,7 @@ class State:
         # Last move attacked flag
         if not self._stack.is_empty() and self._stack.top().is_game_over(): return True
         # Current player has no moves
-        if self.next_player.move_set.is_empty(self.get_cyclic_move()): return True
-        return False
+        return self.next_player.move_set.is_empty(self.get_cyclic_move())
 
     def get_winner(self) -> Optional[Color]:
         r""" Gets the color of the winning player """

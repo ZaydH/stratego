@@ -363,7 +363,7 @@ class Player:
     def get_random_move(self) -> Move:
         r"""
         Selects a piece to move uniformly at random.  Then select the move from that piece's
-        avaiable moves uniformly at random.
+        available moves uniformly at random.
         :return: Randomly selected move
         """
         move_dict = dict()
