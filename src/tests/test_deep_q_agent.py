@@ -70,28 +70,51 @@ def test_move_to_index_information():
     Test that the output node from the neural network has a bijective mapping to possible movements.
     """
     agent = _make_deep_q_agent(NO_BLOCK_BRD)
-    move_locs, state_tuple = set(), ReplayStateTuple(s=agent._state)
+    state_tuple = ReplayStateTuple(s=agent._state)
     brd = state_tuple.s.board
 
     # Verify board size as expected
     assert brd.num_loc == brd.num_rows * brd.num_cols
 
+    # Verify non-scout pieces
     p = state_tuple.s.get_player(Color.RED).get_piece_at_loc(Location(0, 0))
     for i in range(state_tuple.s.board.num_loc):
         p.loc = Location(i // brd.num_cols, i % brd.num_cols)
-        locs = set()
         for j, neighbor in enumerate(p.loc.neighbors()):
             if not brd.is_inside(neighbor): continue
             state_tuple.a = Move(p, p.loc, neighbor)
             board_loc, move_dir_idx = DeepQAgent._get_loc_and_idx_from_move(state_tuple)
-            locs.add(board_loc)
+
+            assert board_loc == i
             # Verify neighbor direction matches expectation
             assert j + state_tuple.s.board.num_loc == move_dir_idx
-        assert len(locs) == 1, "Verify never more than a single location"
-        # Verify never duplicate board loc
-        move_locs |= locs
-    # Verify no duplicate locations
-    assert len(move_locs) == state_tuple.s.board.num_loc
+
+    # Verify scouts specifically
+    p._rank = Rank.scout()
+    for i in range(state_tuple.s.board.num_loc):
+        p.loc = state_tuple.a._orig = Location(i // brd.num_cols, i % brd.num_cols)
+        # Left then right
+        for sign in [1, -1]:
+            ofs = brd.num_loc + (brd.num_rows - 1) + Move.Direction.count()
+            if sign == -1:
+                ofs += (brd.num_rows - 1) + (brd.num_cols - 1)
+            for col_diff in range(0, agent._state.board.num_cols-1):
+                new = p.loc.relative(0, sign * (col_diff + 1))
+                state_tuple.a._new = new
+                board_loc, scout_move_id = DeepQAgent._get_loc_and_idx_from_move(state_tuple)
+                assert i == board_loc
+                assert ofs + col_diff == scout_move_id
+        # Up then down
+        for sign in [1, -1]:
+            ofs = brd.num_loc + Move.Direction.count()
+            if sign == 1:
+                ofs += (brd.num_rows - 1) + (brd.num_cols - 1)
+            for row_diff in range(0, agent._state.board.num_rows - 1):
+                new = p.loc.relative(sign * (row_diff + 1), 0)
+                state_tuple.a._new = new
+                board_loc, scout_move_id = DeepQAgent._get_loc_and_idx_from_move(state_tuple)
+                assert i == board_loc
+                assert ofs + row_diff == scout_move_id
 
 
 # noinspection PyProtectedMember
