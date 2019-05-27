@@ -13,11 +13,11 @@ import pytest
 import torch
 
 import stratego.deep_q_agent
+from stratego import Location
 from stratego.board import Board
-from stratego.deep_q_agent import DeepQAgent
-from stratego.location import Location
+from stratego.deep_q_agent import DeepQAgent, ReplayStateTuple
 from stratego.move import Move
-from stratego.piece import Color, Rank, Piece
+from stratego.piece import Rank, Color
 from stratego.state import State
 from stratego.utils import PathOrStr
 
@@ -65,38 +65,33 @@ def test_deep_q_constructor():
 
 # noinspection PyProtectedMember
 # pylint: disable=protected-access
-def test_output_node_to_locs():
+def test_move_to_index_information():
     r"""
     Test that the output node from the neural network has a bijective mapping to possible movements.
     """
     agent = _make_deep_q_agent(NO_BLOCK_BRD)
+    move_locs, state_tuple = set(), ReplayStateTuple(s=agent._state)
+    brd = state_tuple.s.board
 
-    # Duplicate but sanity check dimensions for below
-    brd = agent._brd  # pylint: disable=protected-access
-    num_rows, num_cols = brd.num_rows, brd.num_cols
-    num_scout_move = agent._num_scout_moves()  # pylint: disable=protected-access
-    assert num_scout_move == (num_rows - 1) + (num_cols - 1)
+    # Verify board size as expected
+    assert brd.num_loc == brd.num_rows * brd.num_cols
 
-    # Ensure boundary checks
-    with pytest.raises(ValueError):
-        agent._get_locs_from_output_node(-1)
-
-    # Ensure bijective mapping of output nodes to moves
-    all_moves = set()
-    for i in range(agent.d_out):
-        all_moves.add(agent._get_locs_from_output_node(i))
-    assert len(all_moves) == agent.d_out, "Multiple output nodes map to same move"
-
-    assert Location(0, 0), Location(0, 1) == agent._get_locs_from_output_node(0)
-    assert Location(0, 1), Location(0, 0) == agent._get_locs_from_output_node(num_scout_move)
-
-    # Test the conversion with the inverse
-    for i in range(agent.d_out):
-        orig, new = agent._get_locs_from_output_node(i)
-        p = Piece(Color.RED, Rank.scout(), orig)
-        m = Move(p, orig, new)
-        assert agent._get_output_node_from_move(m) == i
-
+    p = state_tuple.s.get_player(Color.RED).get_piece_at_loc(Location(0, 0))
+    for i in range(state_tuple.s.board.num_loc):
+        p.loc = Location(i // brd.num_cols, i % brd.num_cols)
+        locs = set()
+        for j, neighbor in enumerate(p.loc.neighbors()):
+            if not brd.is_inside(neighbor): continue
+            state_tuple.a = Move(p, p.loc, neighbor)
+            board_loc, move_dir_idx = DeepQAgent._get_loc_and_idx_from_move(state_tuple)
+            locs.add(board_loc)
+            # Verify neighbor direction matches expectation
+            assert j + state_tuple.s.board.num_loc == move_dir_idx
+        assert len(locs) == 1, "Verify never more than a single location"
+        # Verify never duplicate board loc
+        move_locs |= locs
+    # Verify no duplicate locations
+    assert len(move_locs) == state_tuple.s.board.num_loc
 
 # noinspection PyProtectedMember
 def test_rank_lookup():
@@ -163,6 +158,12 @@ def test_input_builder():
         assert t_in.size(1) == agent.d_in
         assert t_in.size(2) == agent._brd.num_rows
         assert t_in.size(3) == agent._brd.num_cols
+
+        # Verify the layer count segregation
+        plyr_sum = torch.sum(t_in[:, :Rank.count()])
+        assert plyr_sum == len(list(lyr.pieces())), "Verify the piece count for the player"
+        other_sum = torch.sum(t_in[:, Rank.count():2*Rank.count()])
+        assert other_sum == len(list(other.pieces())), "Verify the piece count for the player"
 
         # noinspection PyUnresolvedReferences
         def _get_in_layer(layer_num: int) -> torch.Tensor:

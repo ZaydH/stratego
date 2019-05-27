@@ -619,11 +619,17 @@ class DeepQAgent(Agent, nn.Module):
         return ret_val
 
     @staticmethod
-    def _get_loc_and_idx_from_move(state_tuple: ReplayStateTuple):
+    def _get_loc_and_idx_from_move(state_tuple: ReplayStateTuple) -> Tuple[int, int]:
+        r"""
+        Given a move, get the corresponding location and index of the move information.
+
+        :param state_tuple: State tuple
+        :return: Tuple of the board location index and the move information index
+        """
         brd, a = state_tuple.s.board, state_tuple.a
         idx = a.orig.r * brd.num_cols + a.orig.c
 
-        r_diff, c_diff = (a.orig.r - a.new.r), (a.orig.c - a.new.c)
+        r_diff, c_diff = (a.new.r - a.orig.r), (a.new.c - a.orig.c)
         assert (c_diff == 0 or r_diff == 0) and (c_diff != 0 or r_diff != 0)
         # Any piece other than a scout
         if a.piece.rank != Rank.scout():
