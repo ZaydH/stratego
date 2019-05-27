@@ -173,7 +173,9 @@ class ReplayStateTuple:
 
     def is_terminal(self) -> bool:
         r""" Returns True if this state is terminal """
-        return self.r in DeepQAgent.TERMINAL_REWARDS
+        for x in DeepQAgent.TERMINAL_REWARDS:
+            if self.r.equal(x): return True
+        return False
 
 
 class ReplayMemory:
@@ -222,23 +224,25 @@ class DeepQAgent(Agent, nn.Module):
     # _BLUE_PIECE_VAL = -1
     _IMPASSABLE_VAL = 1.
 
-    _NUM_RES_BLOCKS = 9
+    # _NUM_RES_BLOCKS = 9
+    _NUM_RES_BLOCKS = 4
 
     # Training parameters
     _M = 10000
     _T = 1500  # Maximum number of moves for a state
     _EPS_START = 0.5
-    _gamma = 0.98
-    _LR_START = 0.2
+    _gamma = 0.995
+    # _LR_START = 0.2
+    _LR_START = 0.02
     _f_loss = nn.MSELoss()
-    _LOSS_REWARD = -torch.ones((1, 1))  # Must be -1 since output is tanh
+    _LOSS_REWARD = -torch.ones((1, 2))  # Must be -1 since output is tanh
     _INVALID_MOVE_REWARD = _LOSS_REWARD
     _NON_TERMINAL_MOVE_REWARD = torch.full_like(_LOSS_REWARD, -0.001)
     _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
 
-    TERMINAL_REWARDS = (_LOSS_REWARD, _WIN_REWARD, _LOSS_REWARD)
+    TERMINAL_REWARDS = (_LOSS_REWARD, _WIN_REWARD, _INVALID_MOVE_REWARD)
 
-    _INVALID_FILL_VAL = 10 * float(_INVALID_MOVE_REWARD)
+    _INVALID_FILL_VAL = 10 * float(_INVALID_MOVE_REWARD[0, 0])
 
     _CHECKPOINT_EPISODE_FREQUENCY = 100
     _NUM_HEAD_TO_HEAD_GAMES = 101
@@ -360,10 +364,9 @@ class DeepQAgent(Agent, nn.Module):
         New network architecture has three parts.  Piece location, movement direction, and scout
         distance.  Clearly the last component only applies to scouts.
         """
-        self._num_board_loc = self._brd.num_rows * self._brd.num_cols
         self._tot_num_scout_moves = 2 * (self._brd.num_rows - 1) + 2 * (self._brd.num_cols - 1)
 
-        self._d_out = self._num_board_loc + Move.Direction.count() + self._tot_num_scout_moves
+        self._d_out = self._brd.num_loc + Move.Direction.count() + self._tot_num_scout_moves
 
         # # Maximum Size of the Policy Set
         # # From each location on the board, the player could (assuming no blocked spaces) move to
@@ -427,7 +430,7 @@ class DeepQAgent(Agent, nn.Module):
                     num_rand_moves += 1
                 # Select (epsilon-)greedy action
                 else:
-                    output_node, _, _, t.a = self._get_state_move(t, null_policy=True)
+                    _, t.a = self._get_state_move(t)
                     if t.a.piece is None and self._episode <= 20:
                         t.a = t.s.next_player.get_random_move()
                         num_rand_moves += 1
@@ -444,7 +447,8 @@ class DeepQAgent(Agent, nn.Module):
 
             j_arr = self._replay.get_random()
             # Mini-batch support
-            y_j = torch.tensor([j.r for j in j_arr])
+            reward_arr = [j.r for j in j_arr]
+            y_j = torch.cat(reward_arr, dim=0)
             q_j = torch.zeros_like(y_j)
             for idx, j in enumerate(j_arr):
                 if not j.is_terminal():
@@ -453,7 +457,7 @@ class DeepQAgent(Agent, nn.Module):
                         y_j[idx] = DeepQAgent._WIN_REWARD
                     else:
                         # ToDo Need to fix how board state measured since player changed after move
-                        _, _, y_j_1_val, _ = self._get_state_move(j, null_policy=True)
+                        y_j_1_val, _ = self._get_state_move(j)
                         y_j[idx] = y_j[idx] - self._gamma * y_j_1_val
                         # ToDo may need to rollback multiple moves
                     j.s.rollback()
@@ -524,18 +528,18 @@ class DeepQAgent(Agent, nn.Module):
             utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
         logging.debug("COMPLETED: %s", msg)
 
-    def _punish_invalid_move(self, state_tuple: ReplayStateTuple) -> None:
-        r"""
-        Updates the network to punish for illegal moves
-
-        :param state_tuple: State tuple to be zeroed out
-        """
-        _, policy, _, _ = self._get_state_move(state_tuple)
-        nulled_policy = self._null_blocked_moves(state_tuple, policy, clone=True)
-        p = self._f_loss(policy, nulled_policy)
-        self._optim.zero_grad()
-        p.backward()
-        self._optim.step()
+    # def _punish_invalid_move(self, state_tuple: ReplayStateTuple) -> None:
+    #     r"""
+    #     Updates the network to punish for illegal moves
+    #
+    #     :param state_tuple: State tuple to be zeroed out
+    #     """
+    #     _, policy, _, _ = self._get_state_move(state_tuple)
+    #     nulled_policy = self._null_blocked_moves(state_tuple, policy, clone=True)
+    #     p = self._f_loss(policy, nulled_policy)
+    #     self._optim.zero_grad()
+    #     p.backward()
+    #     self._optim.step()
 
     # def _num_scout_moves(self) -> int:
     #     r"""
@@ -545,38 +549,30 @@ class DeepQAgent(Agent, nn.Module):
     #     """
     #     return (self._brd.num_cols - 1) + (self._brd.num_rows - 1)
 
-    def _get_state_move(self, state_tuple: ReplayStateTuple,
-                        null_policy: bool = False) -> Tuple[int, Tensor, Tensor, Move]:
+    def _get_state_move(self, state_tuple: ReplayStateTuple) -> Tuple[Tensor, Move]:
         r"""
         Gets the move corresponding to the specified state
 
         :param state_tuple: Deep-Q learning state
-        :param null_policy: If True, null out the blocked moves to ensure they are not selected
         :return: Tuple of the output node, entire policy tensor, maximum valued error, and the
                  selected move respectively
         """
         x = DeepQAgent._build_input_tensor(state_tuple.base_tensor, state_tuple.s.pieces(),
                                            state_tuple.s.next_player)
-        policy = self.forward(x)
-        if null_policy:
-            policy = self._null_blocked_moves(state_tuple, policy, clone=True)
-        output_node = int(torch.argmax(policy))
-        move = self._convert_output_node_to_move(output_node, state_tuple.s.next_player,
-                                                 state_tuple.s.other_player)
+        return self._get_next_move(state_tuple.s, x)
 
-        return output_node, policy, policy[:, output_node:output_node+1], move
-
-    def _build_invalid_move_set(self, state_tuple: ReplayStateTuple) -> List[int]:
-        r"""
-        Constructs the list of output nodes that do not represent valid moves in the specified state
-
-        :param state_tuple: State tuple to be used
-        :return: List of invalid move nodes
-        """
-        valid = {self._get_output_node_from_move(m) for m in state_tuple.s.next_player.move_set}
-        cyclic = state_tuple.s.get_cyclic_move()
-        valid -= {self._get_output_node_from_move(m) for m in cyclic}
-        return [i for i in range(self._d_out) if i not in valid]
+    # def _build_invalid_move_set(self, state_tuple: ReplayStateTuple) -> List[int]:
+    #     r"""
+    #     Constructs the list of output nodes that do not represent valid moves in the specified
+    #     state
+    #
+    #     :param state_tuple: State tuple to be used
+    #     :return: List of invalid move nodes
+    #     """
+    #     valid = {self._get_output_node_from_move(m) for m in state_tuple.s.next_player.move_set}
+    #     cyclic = state_tuple.s.get_cyclic_move()
+    #     valid -= {self._get_output_node_from_move(m) for m in cyclic}
+    #     return [i for i in range(self._d_out) if i not in valid]
 
     # def _null_blocked_moves(self, state_tuple: ReplayStateTuple,
     #                         policy: Tensor, clone: bool = False) -> Tensor:
@@ -609,11 +605,48 @@ class DeepQAgent(Agent, nn.Module):
         :param state_tuple: State at step :math:`j`
         :return:
         """
-        output_node = self._get_output_node_from_move(state_tuple.a)
         x = self._build_input_tensor(state_tuple.base_tensor, state_tuple.s.pieces(),
                                      state_tuple.s.next_player)
         y = self.forward(x)
-        return y[:, output_node:output_node + 1]
+        # Extract the scores for specifically the selected piece and move
+        piece_loc_idx, move_idx = self._get_loc_and_idx_from_move(state_tuple)
+        ret_val = torch.empty((x.shape[0], 2), dtype=TensorDType)
+        ret_val[:, 0] = y[:, piece_loc_idx]
+        ret_val[:, 1] = y[:, move_idx]
+        return ret_val
+
+    @staticmethod
+    def _get_loc_and_idx_from_move(state_tuple: ReplayStateTuple):
+        brd, a = state_tuple.s.board, state_tuple.a
+        idx = a.orig.r * brd.num_rows + a.orig.c
+
+        r_diff, c_diff = (a.orig.r - a.new.r), (a.orig.c - a.new.c)
+        assert (c_diff == 0 or r_diff == 0) and (c_diff != 0 or r_diff != 0)
+        # Any piece other than a scout
+        if a.piece.rank != Rank.scout():
+            # Get move direction
+            assert abs(r_diff) + abs(c_diff) == 1
+            for i, move_dir_en in enumerate(Move.Direction.all()):
+                if (r_diff, c_diff) == move_dir_en.value:
+                    return idx, brd.num_loc + i
+            raise ValueError("Should never reach this point")
+        else:
+            assert abs(r_diff) < brd.num_rows and abs(c_diff) < brd.num_cols
+            offset = brd.num_loc + Move.Direction.count()
+            # Scout move UP
+            if r_diff < 0:
+                return idx, offset + (-r_diff - 1)
+            offset += brd.num_rows - 1
+            # Source move RIGHT
+            if c_diff > 0:
+                return idx, offset + (c_diff - 1)
+            offset += brd.num_cols - 1
+            # Scout move DOWN
+            if r_diff > 0:
+                return idx, offset + (r_diff - 1)
+            offset += brd.num_rows - 1
+            # Scout move LEFT
+            return idx, offset + (-c_diff - 1)
 
     # def _convert_output_node_to_move(self, output_node: Union[Tensor, int], plyr: Player,
     #                                  other: Player) -> Move:
@@ -711,65 +744,52 @@ class DeepQAgent(Agent, nn.Module):
         if self._make_rand_move_prob is not None and random.random() < self._make_rand_move_prob:
             return self._plyr.get_random_move()
 
-        state_tuple = ReplayStateTuple(self._state)
-        state_tuple.base_tensor = self._base_in
+        x = DeepQAgent._build_input_tensor(self._base_in, self._state.pieces(),
+                                           self._state.next_player)
+        _, move = self._get_next_move(self._state, x)
+        return move
 
-        x = DeepQAgent._build_input_tensor(state_tuple.base_tensor, state_tuple.s.pieces(),
-                                           state_tuple.s.next_player)
+    def _get_next_move(self, state: State, x: Tensor) -> Tuple[Tensor, Move]:
+        y_out = self.forward(x)
 
-        y = self.forward(x)
         # policy = self._null_blocked_moves(state_tuple, , clone=True)
-        y = self._null_invalid_locations(state_tuple.s, x, y)
-        board_loc = int(y[:, :self._num_board_loc].argmax(dim=1))
+        y = DeepQAgent._null_invalid_locations(state, x, y_out.clone())
+        board_loc = int(y[:, :state.board.num_loc].argmax(dim=1))
+
+        ret_tensor = torch.empty((x.shape[0], 2), dtype=TensorDType)
+        ret_tensor[:, 0] = y_out[:, board_loc]
+
         # Location of the piece to move
         orig = Location(board_loc // self._brd.num_cols, board_loc % self._brd.num_cols)
-        piece = self._state.next_player.get_piece_at_loc(orig)
+        piece = state.next_player.get_piece_at_loc(orig)
         if piece.is_scout():
-            y = self._null_scout_moves(state_tuple.s, piece, y)
-            return self._get_best_scout_move(state_tuple.s, piece, y)
+            y = self._null_scout_moves(state, piece, y)
+            ret_tensor[:, 1], m = self._get_best_scout_move(state, piece, y)
         else:
             # Handle non-scout piece movements
-            y = self._null_invalid_directions(state_tuple.s, piece, y)
-            return self._get_best_adjacent_move(state_tuple.s, piece, y)
+            y = DeepQAgent._null_invalid_directions(state, piece, y)
+            ret_tensor[:, 1], m = DeepQAgent._get_best_adjacent_move(state, piece, y)
+        return ret_tensor, m
 
-        # x = self._build_network_input(self._plyr, self._other)
-        # # Gradients no needed since will not be push backwards
-        # # noinspection PyUnresolvedReferences
-        # with torch.no_grad():
-        #     policy = self.forward(x)
-        # while True:
-        #     out_node = torch.argmax(policy, dim=1)
-        #     try:
-        #         m = self._get_move_from_output_node(out_node, self._plyr, self._other)
-        #         # As a safety always ensure selected move is valid
-        #         if m in self._plyr.move_set:
-        #             return m
-        #         logging.warning("Tried to select move %s to %s for color %s but move is invalid",
-        #                         m.orig, m.new, self.color)
-        #     except (ValueError, AssertionError):
-        #         logging.warning("Runtime exception with out_node: %d" % out_node)
-        #     # Zero out that move and select a different one
-        #     policy[:, out_node] = -torch.ones((policy.size(0)), dtype=TensorDType)
-        # return self._convert_output_node_to_move(output_node, self._plyr, self._state.other_player)
-
-    def _null_invalid_locations(self, state: State, x: Tensor, y: Tensor) -> Tensor:
+    @staticmethod
+    def _null_invalid_locations(state: State, x: Tensor, y: Tensor) -> Tensor:
         # Find the location of the player's pieces
         piece_locs = torch.sum(x[:, :Rank.moveable_count()], dim=1)
         # Convert piece locations to invalid locations
         # Empty spaces have -1 and empty locations have 1
         # noinspection PyUnresolvedReferences
-        null_vec = piece_locs.neg().add(DeepQAgent._PIECE_VAL)
-        null_vec *= DeepQAgent._INVALID_FILL_VAL
+        null_vec = piece_locs.neg().add(DeepQAgent._PIECE_VAL).mul(DeepQAgent._INVALID_FILL_VAL)
         for p in state.next_player.pieces():
             if not state.piece_has_move(p):  # cyclic check
                 null_vec[:, p.loc.r, p.loc.c] = DeepQAgent._INVALID_FILL_VAL
         # Convert from matrix to vector
         null_vec = null_vec.view((null_vec.shape[0], -1))
         # Null out the locations
-        y[:, :self._num_board_loc] += null_vec
+        y[:, :state.board.num_loc] = y[:, :state.board.num_loc] + null_vec
         return y
 
-    def _null_invalid_directions(self, state: State, p: Piece, y: Tensor) -> Tensor:
+    @staticmethod
+    def _null_invalid_directions(state: State, p: Piece, y: Tensor) -> Tensor:
         r""" For non-scout pieces, null out the locations that are valid movements """
         plyr = state.next_player
         # Valid move directions
@@ -780,11 +800,11 @@ class DeepQAgent(Agent, nn.Module):
                 has_loc[i] = True
 
         # Build null vector
-        new_val = 10 * float(DeepQAgent._LOSS_REWARD)
+        new_val = DeepQAgent._INVALID_FILL_VAL
         val = [0 if x else new_val for x in has_loc]
         null_vec = torch.tensor(val, dtype=TensorDType)
         # Null out the locations
-        start = self._num_board_loc
+        start = state.board.num_loc
         y[:, start:start + Move.Direction.count()] += null_vec
         return y
 
@@ -813,43 +833,48 @@ class DeepQAgent(Agent, nn.Module):
         assert offset == self._tot_num_scout_moves
 
         # Null out the locations
-        offset = self._num_board_loc + Move.Direction.count()
+        offset = state.board.num_loc + Move.Direction.count()
         y[:, offset:] += null_vec
         return y
 
-    def _get_best_scout_move(self, state: State, piece: Piece, y: torch.Tensor) -> Move:
+    @staticmethod
+    def _get_best_scout_move(state: State, piece: Piece, y: Tensor) -> Tuple[Tensor, Move]:
         r""" Accessor for the best scout move """
         plyr, loc = state.next_player, piece.loc
+        num_row_idx, num_col_idx = state.board.num_rows - 1, state.board.num_cols - 1
 
-        offset = self._num_board_loc + Move.Direction.count()
+        offset = state.board.num_loc + Move.Direction.count()
         y = y[:, offset:]
         idx = int(torch.argmax(y, dim=1))
+        ret_val = y[:, idx]
         # Check Up
-        if idx < self._brd.num_rows - 1:
-            return plyr.get_move(piece, loc.relative(-(idx + 1), 0))
-        idx -= self._brd.num_rows - 1
+        if idx < num_row_idx:
+            return ret_val, plyr.get_move(piece, loc.relative(-(idx + 1), 0))
+        idx -= num_row_idx
         # Check right
-        if idx < self._brd.num_cols - 1:
-            return plyr.get_move(piece, loc.relative(0, idx + 1))
-        idx -= self._brd.num_cols - 1
+        if idx < num_col_idx:
+            return ret_val, plyr.get_move(piece, loc.relative(0, idx + 1))
+        idx -= num_col_idx
         # Check Down
-        if idx < self._brd.num_rows - 1:
-            return plyr.get_move(piece, loc.relative(idx + 1, 0))
-        idx -= self._brd.num_rows - 1
+        if idx < num_row_idx:
+            return ret_val, plyr.get_move(piece, loc.relative(idx + 1, 0))
+        idx -= num_row_idx
         # Check Left
-        assert idx < self._brd.num_cols - 1
-        return plyr.get_move(piece, loc.relative(0, -(idx + 1)))
+        assert idx < num_col_idx
+        return ret_val, plyr.get_move(piece, loc.relative(0, -(idx + 1)))
 
-    def _get_best_adjacent_move(self, state: State, piece: Piece, y: torch.Tensor) -> Move:
+    @staticmethod
+    def _get_best_adjacent_move(state: State, piece: Piece, y: torch.Tensor) -> Tuple[Tensor, Move]:
         r""" Accessor for the best scout move """
-        start = self._num_board_loc
+        start = state.board.num_loc
         # Get best move direction node in vector
         y = y[:, start:start+Move.Direction.count()]
         move_dir = int(torch.argmax(y, dim=1))
         # Convert node location to actual direction
         move_dir_en = Move.Direction.all()[move_dir]
         # noinspection PyArgumentList
-        return state.next_player.get_move(piece, piece.loc.relative(*move_dir_en.value))
+        move = state.next_player.get_move(piece, piece.loc.relative(*move_dir_en.value))
+        return y[:, move_dir], move
 
     # def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
     #     r"""
