@@ -559,7 +559,8 @@ class DeepQAgent(Agent, nn.Module):
         :return: List of invalid move nodes
         """
         valid = {self._get_output_node_from_move(m) for m in state_tuple.s.next_player.move_set}
-        valid -= state_tuple.s.get_cyclic_move()
+        cyclic = state_tuple.s.get_cyclic_move()
+        valid -= {self._get_output_node_from_move(m) for m in cyclic}
         return [i for i in range(self._d_out) if i not in valid]
 
     def _null_blocked_moves(self, state_tuple: ReplayStateTuple,
@@ -696,7 +697,7 @@ class DeepQAgent(Agent, nn.Module):
             return self._plyr.get_random_move()
 
         x = DeepQAgent._build_input_tensor(self._base_in, self._state.pieces(),
-                                           self._state.other_player)
+                                           self._state.next_player)
 
         state_tuple = ReplayStateTuple(self._state)
         policy = self._null_blocked_moves(state_tuple, self.forward(x), clone=True)
