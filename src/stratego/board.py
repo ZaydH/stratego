@@ -117,6 +117,7 @@ class Board:
         self._rows = self._cols = None
         self._blocked = set()  # locations within board boundaries pieces cannot enter
         self.piece_set = Board.PieceSet()
+        self.num_loc = None
 
     @property
     def num_rows(self) -> int:
@@ -184,6 +185,7 @@ class Board:
                 raise ValueError("Unparseable file line \"%s\"" % line)
         # Sanity check the configuration
         assert brd._is_valid()  # pylint: disable=protected-access
+        brd.num_loc = brd.num_rows * brd.num_cols
         return brd
 
     # noinspection PyProtectedMember
