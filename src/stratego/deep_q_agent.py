@@ -425,7 +425,7 @@ class DeepQAgent(Agent, nn.Module):
         progress_bar = tqdm(range(self._T), total=self._T, file=sys.stdout, disable=IS_TALAPAS)
         for i in progress_bar:
             # With probability < \epsilon, select a random action
-            if not t.s.next_player.move_set.is_empty():
+            if not t.s.next_player.move_set.is_empty(t.s.get_cyclic_move()):
                 if random.random() < self._eps:
                     t.a = t.s.next_player.get_random_move()
                     num_rand_moves += 1
