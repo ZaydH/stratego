@@ -330,6 +330,23 @@ class State:
 
         self._printer.add_piece(move.piece)
 
+    def is_not_cyclic(self, m: Move) -> bool:
+        r""" Check whether the specified move is in the set of cyclic moves"""
+        for c_m in self.get_cyclic_move():
+            if Move.is_identical(m, c_m):
+                return False
+        return True
+
+    def piece_has_move(self, p: Piece) -> bool:
+        r""" Returns \p True if the piece has any move at all"""
+        # Since pieces cant jump only need to check adjacent locs.  No adjacent moves, then
+        # definitely has no move at all
+        for m in self.get_player(p.color).move_set.avail.values():
+            if m.piece.color == p.color and m.orig == p.loc and m.piece.rank == p.rank:
+                if self.is_not_cyclic(m):
+                    return True
+        return False
+
     def is_game_over(self) -> bool:
         r""" Returns True if the game has ended """
         # Last move attacked flag
