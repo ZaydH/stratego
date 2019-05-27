@@ -696,7 +696,7 @@ class DeepQAgent(Agent, nn.Module):
             return self._plyr.get_random_move()
 
         x = DeepQAgent._build_input_tensor(self._base_in, self._state.pieces(),
-                                           self._state.other_player)
+                                           self._state.next_player)
 
         state_tuple = ReplayStateTuple(self._state)
         policy = self._null_blocked_moves(state_tuple, self.forward(x), clone=True)
