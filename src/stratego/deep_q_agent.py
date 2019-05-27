@@ -454,7 +454,7 @@ class DeepQAgent(Agent, nn.Module):
             for idx, j in enumerate(j_arr):
                 if not j.is_terminal():
                     j.s.update(j.a)
-                    if j.s.next_player.move_set.is_empty():
+                    if j.s.next_player.move_set.is_empty(j.s.get_cyclic_move()):
                         y_j[idx] = DeepQAgent._WIN_REWARD
                     else:
                         # ToDo Need to fix how board state measured since player changed after move

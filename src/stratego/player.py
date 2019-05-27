@@ -217,9 +217,18 @@ class MoveSet:
 
     def is_empty(self, cyclic_moves: Set[Move] = None) -> bool:
         r""" Returns \p True if the \p MoveSet is empty """
-        if cyclic_moves is not None:
-            avail = set(self.avail.values()) - cyclic_moves
-            return len(avail) == 0
+        if cyclic_moves is not None and cyclic_moves:
+            avail = set(self.avail.values())
+            # If available larger than cyclic, definitely not empty move set
+            if len(avail) > len(cyclic_moves): return False
+            # Check if each available moves in cyclic.  If any not in there, not empty move set
+            for a_m in avail:
+                for c_m in cyclic_moves:
+                    if Move.is_identical(a_m, c_m):
+                        break
+                else:
+                    return False
+            return True
         return not bool(self.avail)
 
     def __iter__(self):
