@@ -432,9 +432,9 @@ class DeepQAgent(Agent, nn.Module):
                 # Select (epsilon-)greedy action
                 else:
                     _, t.a = self._get_state_move(t)
-                    if t.a.piece is None and self._episode <= 20:
-                        t.a = t.s.next_player.get_random_move()
-                        num_rand_moves += 1
+                    # if t.a.piece is None and self._episode <= 20:
+                    #     t.a = t.s.next_player.get_random_move()
+                    #     num_rand_moves += 1
                 f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
                 f_out.flush()
 
@@ -516,12 +516,14 @@ class DeepQAgent(Agent, nn.Module):
             elif winner is None:
                 max_move += 1
 
-        win_freq = num_wins / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES
+        max_timeouts_to_consider = 5
+        denom = DeepQAgent._NUM_HEAD_TO_HEAD_GAMES - min(max_timeouts_to_consider, max_move)
+        win_freq = num_wins / denom
         logging.debug("Episode %d: Head to head win frequency %.3f", self._episode, win_freq)
         f_max = max_move / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES
         logging.debug("Episode %d: Halted due to max moves frequency %.3f", self._episode, f_max)
 
-        if 0.5 < num_wins / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES:
+        if 0.5 <= denom:
             logging.debug("Head to Head: Backing up new best model")
             utils.save_module(self, DeepQAgent._TRAIN_BEST_MODEL)
         else:
