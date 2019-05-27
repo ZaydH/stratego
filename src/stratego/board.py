@@ -38,6 +38,10 @@ class ToEdgeLists:
         for attr in [self.up, self.right, self.down, self.left]:
             yield attr
 
+    @staticmethod
+    def order():
+        return [ToEdgeLists.UP, ToEdgeLists.RIGHT, ToEdgeLists.DOWN, ToEdgeLists.LEFT]
+
     def set(self, dir: int, to_edge_list: List[Location]) -> None:
         if dir == ToEdgeLists.UP: self.up = to_edge_list
         elif dir == ToEdgeLists.RIGHT: self.right = to_edge_list

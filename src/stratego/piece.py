@@ -67,6 +67,10 @@ class Rank:
         r""" Accessor for the total number of ranks """
         return len(Rank.get_all())
 
+    @staticmethod
+    def moveable_count() -> int:
+        return Rank.count() - 2  # Exclude bomb and flag
+
     @property
     def value(self) -> Union[str, int]:
         r""" Accessor for the rank's value """

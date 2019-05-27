@@ -1,5 +1,6 @@
 import logging
-from typing import Optional
+from enum import Enum
+from typing import List, Optional
 
 from .board import Board
 from .location import Location
@@ -7,6 +8,26 @@ from .piece import Piece, Rank
 
 
 class Move:
+    r""" Encapsulates a piece movement """
+
+    class Direction(Enum):
+        r""" Defines the direction pieces can move """
+        Up = (-1, 0)
+        Right = (0, 1)
+        Down = (1, 0)
+        Left = (0, -1)
+
+        @staticmethod
+        def all() -> 'List[Move.Direction]':
+            r""" Defines all possible move directions """
+            return [Move.Direction.Up, Move.Direction.Right, Move.Direction.Down,
+                    Move.Direction.Left]
+
+        @staticmethod
+        def count() -> int:
+            r""" Number of (total) possible move directions"""
+            return 4
+
     _brd = None
     DISABLE_ASSERT_CHECKS = False
 
