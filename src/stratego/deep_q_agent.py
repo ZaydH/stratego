@@ -383,7 +383,9 @@ class DeepQAgent(Agent, nn.Module):
         # If a trained model exists, load it. Otherwise, backup the default model
         if DeepQAgent._TRAIN_BEST_MODEL.exists():
             utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
-        bypass_first_head_to_head = True
+            bypass_first_head_to_head = False
+        else:
+            bypass_first_head_to_head = True
 
         self._replay = ReplayMemory()
 
@@ -617,7 +619,7 @@ class DeepQAgent(Agent, nn.Module):
     @staticmethod
     def _get_loc_and_idx_from_move(state_tuple: ReplayStateTuple):
         brd, a = state_tuple.s.board, state_tuple.a
-        idx = a.orig.r * brd.num_rows + a.orig.c
+        idx = a.orig.r * brd.num_cols + a.orig.c
 
         r_diff, c_diff = (a.orig.r - a.new.r), (a.orig.c - a.new.c)
         assert (c_diff == 0 or r_diff == 0) and (c_diff != 0 or r_diff != 0)
