@@ -12,7 +12,7 @@ import pytest
 
 import torch
 
-import stratego.deep_q_agent
+import stratego.deep_q_agent as deep_q_agent
 from stratego import Location
 from stratego.board import Board
 from stratego.deep_q_agent import DeepQAgent, ReplayStateTuple
@@ -30,13 +30,13 @@ def switch_to_int_tensor():
     Helper function to streamline testing to use integer tensors so no floating point errors in
     the test calculations.
     """
-    orig_dtype = stratego.deep_q_agent.TensorDType
-    stratego.deep_q_agent.TensorDType = torch.int32
+    orig_dtype = deep_q_agent.TensorDType
+    deep_q_agent.TensorDType = torch.int32
     # Code that will run before your test, for example:
     # A test function will be run at this point
     yield
     # Code that will run after test
-    stratego.deep_q_agent.TensorDType = orig_dtype
+    deep_q_agent.TensorDType = orig_dtype
 
 
 def _make_deep_q_agent(brd: Board = STD_BRD,
@@ -92,6 +92,7 @@ def test_move_to_index_information():
         move_locs |= locs
     # Verify no duplicate locations
     assert len(move_locs) == state_tuple.s.board.num_loc
+
 
 # noinspection PyProtectedMember
 def test_rank_lookup():
@@ -177,3 +178,29 @@ def test_input_builder():
 
         # Blocked piece location
         assert torch.sum(_get_in_layer(DeepQAgent._impass_layer)) == len(agent._brd.blocked)
+
+
+# noinspection PyTypeChecker,PyUnresolvedReferences,PyProtectedMember
+def test_null_functions():
+    r""" Verify that the input builder script works as expected """
+    prev_dtype = deep_q_agent.TensorDType
+    deep_q_agent.TensorDType = torch.float32
+
+    agent = _make_deep_q_agent(state_file=STATES_PATH / "deep_q_verify.txt")
+
+    x = agent._build_network_input(agent._state.red, agent._state.blue)
+    y = torch.rand((1, agent._d_out))
+    y_p = agent._null_invalid_locations(agent._state, x, y.clone())
+    assert float(y_p[0, 0]) < DeepQAgent._INVALID_FILL_VAL / 2
+
+    # Verify location of pieces
+    piece_locations = {1, 2, 3, 5, agent._state.board.num_cols}
+    for i in piece_locations:
+        assert float(y_p[0, i]) > -0.1
+    # Verification locations where there are no pieces of current player
+    for i in range(agent._state.board.num_loc):
+        if i in piece_locations: continue
+        assert float(y_p[0, i]) < DeepQAgent._INVALID_FILL_VAL / 2
+
+    # Restore data type
+    deep_q_agent.TensorDType = prev_dtype
