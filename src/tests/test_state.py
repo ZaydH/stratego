@@ -241,3 +241,119 @@ def _helper_small_test(move_info, state_file: str = "moveset_small_direct_attack
         _verify_num_pieces_and_move_set_size(state, num_red_p, num_blue_p,
                                              num_red_mv, num_blue_mv)
         assert brd[-i - 1] == state.write_board()
+
+
+def test_if_has_move():
+    r""" Verify the \p piece_has_move method of the \p State class """
+    path = STATES_PATH / "deep_q_verify.txt"
+    state = State.importer(path, STD_BRD)
+
+    # Marshall cannot move
+    marshall_loc = Location(0, 0)
+    p = state.get_player(Color.RED).get_piece_at_loc(marshall_loc)
+    assert not state.piece_has_move(p)
+
+    # Rank3 can move
+    rank3_loc = Location(1, 0)
+    p = state.get_player(Color.RED).get_piece_at_loc(rank3_loc)
+    assert state.piece_has_move(p)
+
+    # Bomb cannot move
+    bomb_loc = Location(0, 4)
+    p = state.get_player(Color.RED).get_piece_at_loc(bomb_loc)
+    assert not state.piece_has_move(p)
+
+    # Flag cannot move
+    flag_loc = Location(0, 6)
+    p = state.get_player(Color.RED).get_piece_at_loc(flag_loc)
+    assert not state.piece_has_move(p)
+
+    # verify pieces with known moves
+    piece_col = (1, 2, 3, 5)
+    for col in piece_col:
+        flag_loc = Location(0, col)
+        p = state.get_player(Color.RED).get_piece_at_loc(flag_loc)
+        assert state.piece_has_move(p)
+
+        flag_loc = Location(state.board.num_rows - 1, col)
+        p = state.get_player(Color.BLUE).get_piece_at_loc(flag_loc)
+        assert state.piece_has_move(p)
+
+
+# noinspection PyProtectedMember
+def test_cyclic_move():
+    state = State.importer(STATES_PATH / "state_move_verify.txt", STD_BRD)
+    assert len(state._stack) == 0, "Move stack to begin with"
+
+    num_moves = 0
+    orig, new = (0, 1), (1, 1)
+    m = _get_move_from_player(state.next_player, orig, new)
+    state.update(m)
+    num_moves += 1
+    assert len(state._stack) == num_moves
+    assert len(state.get_cyclic_move()) == 0, "No cyclic move"
+
+    # Dummy moves to ensure no premature cycle
+    orig, new = (9, 1), (8, 1)
+    m = _get_move_from_player(state.next_player, orig, new)
+    state.update(m)
+    num_moves += 1
+    assert len(state._stack) == num_moves
+    assert len(state.get_cyclic_move()) == 0, "No cyclic move"
+
+    # Start of cycle
+    orig, new = (0, 0), (1, 0)
+    m = _get_move_from_player(state.next_player, orig, new)
+    state.update(m)
+    num_moves += 1
+    assert len(state._stack) == num_moves
+    assert len(state.get_cyclic_move()) == 0, "No cyclic move"
+
+    orig, new = (9, 0), (8, 0)
+    m = _get_move_from_player(state.next_player, orig, new)
+    state.update(m)
+    num_moves += 1
+    assert len(state._stack) == num_moves
+    assert len(state.get_cyclic_move()) == 0, "No cyclic move"
+
+    orig, new = (1, 0), (0, 0)
+    m = _get_move_from_player(state.next_player, orig, new)
+    state.update(m)
+    num_moves += 1
+    assert len(state._stack) == num_moves
+    assert len(state.get_cyclic_move()) == 0, "No cyclic move"
+
+    orig, new = (8, 0), (9, 0)
+    m = _get_move_from_player(state.next_player, orig, new)
+    state.update(m)
+    num_moves += 1
+    assert len(state._stack) == num_moves
+    assert len(state.get_cyclic_move()) == 0, "No cyclic move"
+
+    orig, new = (0, 0), (1, 0)
+    m = _get_move_from_player(state.next_player, orig, new)
+    state.update(m)
+    num_moves += 1
+    assert len(state._stack) == num_moves
+    assert len(state.get_cyclic_move()) == 0, "No cyclic move"
+
+    orig, new = (9, 0), (8, 0)
+    m = _get_move_from_player(state.next_player, orig, new)
+    state.update(m)
+    num_moves += 1
+    assert len(state._stack) == num_moves
+    assert len(state.get_cyclic_move()) == 1, "Cyclic move now"
+
+    orig, new = (1, 1), (0, 1)
+    m = _get_move_from_player(state.next_player, orig, new)
+    state.update(m)
+    num_moves += 1
+    assert len(state._stack) == num_moves
+    assert len(state.get_cyclic_move()) == 1, "Cyclic move now"
+
+    orig, new = (8, 1), (9, 1)
+    m = _get_move_from_player(state.next_player, orig, new)
+    state.update(m)
+    num_moves += 1
+    assert len(state._stack) == num_moves
+    assert len(state.get_cyclic_move()) == 0, "Cycle removed"

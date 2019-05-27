@@ -163,6 +163,7 @@ class Move:
         if m1.is_attack():
             piece_grps.append((m1.attacked, m2.attacked))
         for p1, p2 in piece_grps:
+            res = res and p1.id_num == p2.id_num
             res = res and p1.rank == p2.rank and p1.color == p2.color
             res = res and p1.loc == p2.loc
         return res
@@ -191,10 +192,10 @@ class MoveStack:
         r""" Place \p move on the top of the stack """
         return self._buf.append(move)
 
-    def is_cyclic(self, move: Move) -> bool:
-        # ToDo implement is_cyclic check
-        logging.warning("ToDO: is_cyclic check not implemented")
-        return False
+    # def is_cyclic(self, move: Move) -> bool:
+    #     # ToDo implement is_cyclic check
+    #     logging.warning("ToDO: is_cyclic check not implemented")
+    #     return False
 
     def is_empty(self) -> bool:
         r""" Return True if \p MoveStack is empty """

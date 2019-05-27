@@ -54,10 +54,13 @@ def test_deep_q_constructor():
     num_rows, num_cols = brd.num_rows, brd.num_cols
 
     # Assuming no blocked squares, scouts can always move the same number of squares
-    num_scout_move = agent._num_scout_moves()  # pylint: disable=protected-access
-    assert num_scout_move == (num_rows - 1) + (num_cols - 1)
+    num_scout_move = 2 * ((num_rows - 1) + (num_cols - 1))
+    assert agent._tot_num_scout_moves == num_scout_move
     # Verify the number of output dimensions
-    assert agent.d_out == num_rows * num_cols * num_scout_move
+    out_count = num_rows * num_cols
+    out_count += len(Move.Direction.all())
+    out_count += num_scout_move
+    assert agent.d_out == out_count
 
 
 # noinspection PyProtectedMember

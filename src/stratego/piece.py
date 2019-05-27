@@ -224,6 +224,11 @@ class Piece:
         r""" Mutator for the piece's location """
         self._loc = loc
 
+    @property
+    def id_num(self) -> int:
+        r""" Accessor for the piece identification number """
+        return self._id
+
     def is_immobile(self) -> bool:
         r""" Returns True if piece cannot move """
         return self._rank.is_immobile()

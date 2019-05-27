@@ -9,14 +9,16 @@ r"""
     :copyright: (c) 2019 by Zayd Hammoudeh.
     :license: MIT, see LICENSE for more details.
 """
+import copy
 
 import pytest
 
+from stratego import State
 from stratego.location import Location
 from stratego.move import Move
 from stratego.piece import Color, Piece, Rank
 
-from testing_utils import STD_BRD, build_test_board, substr_in_err
+from testing_utils import STATES_PATH, STD_BRD, build_test_board, substr_in_err
 
 Move.set_board(STD_BRD)
 
@@ -35,6 +37,22 @@ def test_verify_neighbor_movements():
     for l_new in l_orig.neighbors():
         other.loc = l_new
         Move(p, l_orig, l_new, other)
+
+
+def test_move_direction():
+    r""" Verify the \p Move.Direction object """
+    # Verify all keys are present
+    assert len([e for e in Move.Direction]) == len(Move.Direction.all())
+    # Ensure no duplication objects in all directions
+    assert len(set(Move.Direction.all())) == len(Move.Direction.all())
+    # Verify the move counts
+    assert Move.Direction.count() == len(Move.Direction.all())
+
+    # Verify all the directions make sense
+    assert Move.Direction.Left.value == (0, -1)
+    assert Move.Direction.Down.value == (1, 0)
+    assert Move.Direction.Right.value == (0, 1)
+    assert Move.Direction.Up.value == (-1, 0)
 
 
 def test_outside_board_moves():
@@ -159,3 +177,56 @@ def test_immovable_pieces():
             if r in immovable:
                 with pytest.raises(Exception):
                     Move(p, p.loc, new_loc)
+
+
+# noinspection PyProtectedMember
+def test_is_identical():
+    r""" Verify the \p piece_has_move method of the \p State class """
+    path = STATES_PATH / "state_move_verify.txt"
+    state = State.importer(path, STD_BRD)
+
+    orig, new = Location(0, 0), Location(1, 0)
+    # Get the state information
+    p_state = state.red.get_piece_at_loc(orig)
+    m_state = state.red.get_move(p_state, new)
+    # Build a move for comparison
+    p = copy.deepcopy(state.red.get_piece_at_loc(orig))
+    m = Move(p, orig, new)
+
+    assert m_state != m, "Equality fails since different references"
+    assert Move.is_identical(m, m_state), "Verify the two moves are identical"
+    assert Move.is_identical(m_state, m), "Verify the two moves are identical"
+
+    # Color checks
+    m._piece._color = Color.BLUE
+    assert not Move.is_identical(m, m_state), "Verify if color does not match test fails"
+    assert not Move.is_identical(m_state, m), "Verify if color does not match test fails"
+    m._piece._color = Color.RED
+    assert Move.is_identical(m, m_state), "Verify move correctly restored"
+
+    # Rank checks
+    prev_rank, m._piece._rank = m.piece.rank, Rank.flag()
+    assert not Move.is_identical(m, m_state), "Verify if rank does not match test fails"
+    assert not Move.is_identical(m_state, m), "Verify if rank does not match test fails"
+    m._piece._rank = prev_rank
+    assert Move.is_identical(m_state, m), "Verify move correctly restored"
+
+    # New checks
+    m._new = orig
+    assert not Move.is_identical(m, m_state), "Verify new will cause a failure"
+    assert not Move.is_identical(m_state, m), "Verify new will cause a failure"
+    m._new = new
+    assert Move.is_identical(m, m_state), "Verify move correctly restored"
+
+    # Old checks
+    m._orig = new
+    assert not Move.is_identical(m, m_state), "Verify orig will cause a failure"
+    assert not Move.is_identical(m_state, m), "Verify orig will cause a failure"
+    m._orig = orig
+    assert Move.is_identical(m, m_state), "Verify move correctly restored"
+
+    attacked, m._attacked = m._attacked, []  # Just give it so not None
+    assert not Move.is_identical(m, m_state), "Verify attacked will cause a failure"
+    assert not Move.is_identical(m_state, m), "Verify attacked will cause a failure"
+    m._attacked = attacked
+    assert Move.is_identical(m, m_state), "Verify move correctly restored"
