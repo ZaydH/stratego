@@ -360,7 +360,7 @@ class State:
             return None
         if not self._stack.is_empty() and self._stack.top().is_game_over():
             return self._stack.top().piece.color
-        if self.next_player.move_set.is_empty():
+        if self.next_player.move_set.is_empty(self.get_cyclic_move()):
             return self.other_player.color
         raise RuntimeError("Not able to determine winner")
 
