@@ -129,6 +129,23 @@ class Move:
             return False
         return True
 
+    @staticmethod
+    def is_identical(m1: 'Move', m2: 'Move') -> bool:
+        r""" Checks whether two moves are identical """
+        res = True
+        res = res and m1.orig == m2.orig and m1.new == m2.new
+        res = res and m1.is_attack() == m2.is_attack()
+        if not res:
+            return False
+
+        piece_grps = [(m1.piece, m2.piece)]
+        if m1.is_attack():
+            piece_grps.append((m1.attacked, m2.attacked))
+        for p1, p2 in piece_grps:
+            res = res and p1.rank == p2.rank and p1.color == p2.color
+            res = res and p1.loc == p2.loc
+        return res
+
     # def __eq__(self, other: 'Move') -> bool:
     #     return (isinstance(other, Move) and self.piece == other.piece and self.orig == other.orig
     #             and self.new == other.new and self.attacked == other.attacked)

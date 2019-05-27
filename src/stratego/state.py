@@ -159,9 +159,8 @@ class State:
         #     # noinspection PyTypeChecker
         #     invalid_moves = set(self._stack[-2:end:-2])
         #     return invalid_moves
-        cyclic_check_min_length = 6
-        if (len(self._stack) >= cyclic_check_min_length
-                and self._stack[-2] == self._stack[-cyclic_check_min_length]):
+        cyc_min_len = 6
+        if len(self._stack) >= cyc_min_len and Move.is_identical(self._stack[-2], self._stack[-6]):
             return {self._stack[-4]}
         return set()
 
