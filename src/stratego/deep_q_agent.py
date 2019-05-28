@@ -167,15 +167,24 @@ class ResBlock(nn.Module):
 @dataclass(init=True)
 class ReplayStateTuple:
     s: State = None
+    s_p: State = None
     a: Move = None
     base_tensor: Tensor = None
     r: Tensor = None
+
+    _next_move_empty: bool = None
 
     def is_terminal(self) -> bool:
         r""" Returns True if this state is terminal """
         for x in DeepQAgent.TERMINAL_REWARDS:
             if self.r.equal(x): return True
         return False
+
+    def is_s_p_move_empty(self) -> bool:
+        r""" Memoize whether \p MoveSet empty to prevent rechecking """
+        if self._next_move_empty is None:
+            self._next_move_empty = self.s_p.is_next_moves_empty()
+        return self._next_move_empty
 
 
 class ReplayMemory:
@@ -436,14 +445,14 @@ class DeepQAgent(Agent, nn.Module):
                     num_rand_moves += 1
                 # Select (epsilon-)greedy action
                 else:
-                    _, t.a = self._get_state_move(t)
+                    _, t.a = self._get_state_move(t.s, t.base_tensor)
                 f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
                 f_out.flush()
 
             # Handle case player already lost
             if t.s.is_game_over(): t.r = self._LOSS_REWARD
             # Player about to win
-            elif t.a.is_attack() and t.a.attacked.rank == Rank.flag(): t.r = self._WIN_REWARD
+            elif t.a.is_game_over(): t.r = self._WIN_REWARD
             # Game not over yet
             else: t.r = self._NON_TERMINAL_MOVE_REWARD
             self._replay.add(t)
@@ -457,15 +466,18 @@ class DeepQAgent(Agent, nn.Module):
                 q_j[idx] = self._get_action_output_score(j)
                 if j.is_terminal(): continue
 
-                j.s.update(j.a)
-                if j.s.is_next_moves_empty():
+                # Only time update to save time
+                if j.s_p is None:
+                    j.s_p = copy.deepcopy(j.s)
+                    j.s_p.update(j.a)
+
+                if j.is_s_p_move_empty():
                     y_j[idx] = DeepQAgent._WIN_REWARD
                 else:
                     # ToDo Need to fix how board state measured since player changed after move
-                    y_j_1_val, _ = self._get_state_move(j)
+                    y_j_1_val, _ = self._get_state_move(j.s_p, j.base_tensor)
                     y_j[idx] = y_j[idx] - self._gamma * y_j_1_val
                     # ToDo may need to rollback multiple moves
-                j.s.rollback()
             loss = self._f_loss(y_j, q_j)
             self._optim.zero_grad()
             loss.backward()
@@ -560,17 +572,15 @@ class DeepQAgent(Agent, nn.Module):
     #     """
     #     return (self._brd.num_cols - 1) + (self._brd.num_rows - 1)
 
-    def _get_state_move(self, state_tuple: ReplayStateTuple) -> Tuple[Tensor, Move]:
+    def _get_state_move(self, s: State, base_tensor: torch.Tensor) -> Tuple[Tensor, Move]:
         r"""
         Gets the move corresponding to the specified state
 
-        :param state_tuple: Deep-Q learning state
         :return: Tuple of the output node, entire policy tensor, maximum valued error, and the
                  selected move respectively
         """
-        x = DeepQAgent._build_input_tensor(state_tuple.base_tensor, state_tuple.s.pieces(),
-                                           state_tuple.s.next_player)
-        return self._get_next_move(state_tuple.s, x)
+        x = DeepQAgent._build_input_tensor(base_tensor, s.pieces(), s.next_player)
+        return self._get_next_move(s, x)
 
     # def _build_invalid_move_set(self, state_tuple: ReplayStateTuple) -> List[int]:
     #     r"""
@@ -647,23 +657,24 @@ class DeepQAgent(Agent, nn.Module):
                 if (r_diff, c_diff) == move_dir_en.value:
                     return idx, brd.num_loc + i
             raise ValueError("Should never reach this point")
-        else:
-            assert abs(r_diff) < brd.num_rows and abs(c_diff) < brd.num_cols
-            offset = brd.num_loc + Move.Direction.count()
-            # Scout move UP
-            if r_diff < 0:
-                return idx, offset + (-r_diff - 1)
-            offset += brd.num_rows - 1
-            # Source move RIGHT
-            if c_diff > 0:
-                return idx, offset + (c_diff - 1)
-            offset += brd.num_cols - 1
-            # Scout move DOWN
-            if r_diff > 0:
-                return idx, offset + (r_diff - 1)
-            offset += brd.num_rows - 1
-            # Scout move LEFT
-            return idx, offset + (-c_diff - 1)
+
+        # Handle scout moves
+        assert abs(r_diff) < brd.num_rows and abs(c_diff) < brd.num_cols
+        offset = brd.num_loc + Move.Direction.count()
+        # Scout move UP
+        if r_diff < 0:
+            return idx, offset + (-r_diff - 1)
+        offset += brd.num_rows - 1
+        # Source move RIGHT
+        if c_diff > 0:
+            return idx, offset + (c_diff - 1)
+        offset += brd.num_cols - 1
+        # Scout move DOWN
+        if r_diff > 0:
+            return idx, offset + (r_diff - 1)
+        offset += brd.num_rows - 1
+        # Scout move LEFT
+        return idx, offset + (-c_diff - 1)
 
     # def _convert_output_node_to_move(self, output_node: Union[Tensor, int], plyr: Player,
     #                                  other: Player) -> Move:

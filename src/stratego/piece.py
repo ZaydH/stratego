@@ -69,6 +69,7 @@ class Rank:
 
     @staticmethod
     def moveable_count() -> int:
+        r""" Number of ranks that are allowed to move.  Excludes bomb and flag """
         return Rank.count() - 2  # Exclude bomb and flag
 
     @property
