@@ -376,7 +376,7 @@ class DeepQAgent(Agent, nn.Module):
         eps_range = np.linspace(self._eps, self._EPS_END, num=num_rem_episodes, endpoint=True)
         # Decrement epsilon with each step
         for self._episode, self._eps in zip(range(self._episode, self._M + 1), eps_range):
-            logging.debug("Episode %d: alpha = %.6f", self._episode, self._eps)
+            logging.debug("Episode %d: epsilon = %.6f", self._episode, self._eps)
             # noinspection PyProtectedMember
             t = ReplayStateTuple(s=copy.deepcopy(s_0),
                                  base_tensor=DeepQAgent._build_base_tensor(s_0.board, self.d_in))
