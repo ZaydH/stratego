@@ -463,7 +463,7 @@ class DeepQAgent(Agent, nn.Module):
                 else:
                     # ToDo Need to fix how board state measured since player changed after move
                     y_j_1_val, _ = self._get_state_move(j)
-                    y_j[idx] -= self._gamma * y_j_1_val
+                    y_j[idx] = y_j[idx] - self._gamma * y_j_1_val
                     # ToDo may need to rollback multiple moves
                 j.s.rollback()
             loss = self._f_loss(y_j, q_j)
