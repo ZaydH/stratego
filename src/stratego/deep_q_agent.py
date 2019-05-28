@@ -295,6 +295,12 @@ class DeepQAgent(Agent, nn.Module):
 
         self._construct_network()
         self._replay = None
+
+        self._episode = 0
+        self._optim = optim.Adam(self.parameters(), lr=DeepQAgent._LR_START)
+        self._lr_sched = optim.lr_scheduler.MultiStepLR(self._optim, milestones=[1000, 2000, 3000],
+                                                        gamma=0.1)
+
         for model_path in [DeepQAgent._EXPORTED_MODEL, DeepQAgent._TRAIN_BEST_MODEL]:
             if model_path.exists(): break
         if not disable_import and model_path.exists():
@@ -304,11 +310,6 @@ class DeepQAgent(Agent, nn.Module):
             logging.debug("COMPLETED: %s" % msg)
         # Must be last in constructor to ensure proper CUDA enabling
         if IS_CUDA: self.cuda()
-
-        self._episode = 0
-        self._optim = optim.Adam(self.parameters(), lr=DeepQAgent._LR_START)
-        self._lr_sched = optim.lr_scheduler.MultiStepLR(self._optim, milestones=[1000, 2000, 3000],
-                                                        gamma=0.1)
 
     def _set_nn_param(self, name: str, val: Union[int, float]):
         r"""
