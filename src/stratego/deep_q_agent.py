@@ -320,8 +320,9 @@ class DeepQAgent(Agent, nn.Module):
         :param val: Value to set the parameter \p name
         """
         # noinspection PyUnresolvedReferences
-        tensor_type = torch.IntTensor if isinstance(val, int) else Tensor
-        self.__setattr__(name, nn.Parameter(tensor_type([val]), requires_grad=False))
+        tensor_dtype = torch.int32 if isinstance(val, int) else torch.float32
+        tensor_val = torch.tensor([val], dtype=tensor_dtype)
+        self.__setattr__(name, nn.Parameter(tensor_val, requires_grad=False))
 
     def _get_nn_param(self, param_name: str) -> Union[int, float]:
         r"""
@@ -330,7 +331,7 @@ class DeepQAgent(Agent, nn.Module):
         """
         param_val = self.__getattr__(param_name)
         # noinspection PyUnresolvedReferences
-        param_type = int if isinstance(param_val, torch.IntTensor) else float
+        param_type = int if param_val.dtype == torch.int32 else float
         return param_type(param_val[0])
 
     @property
