@@ -174,6 +174,8 @@ class Move:
 
 
 class MoveStack:
+    _COMPRESSED_SIZE = 6
+
     r""" Checks for cyclic moves """
     def __init__(self):
         self._buf = []
@@ -200,6 +202,19 @@ class MoveStack:
     def is_empty(self) -> bool:
         r""" Return True if \p MoveStack is empty """
         return not bool(self._buf)
+
+    def empty(self) -> None:
+        r""" Empties the move stack's contents. """
+        self._buf = []
+
+    def partial_empty(self) -> None:
+        r""" Partially empty move stack to clear the cyclic. """
+        self._buf = self._buf[-4:]
+
+    def compress(self) -> None:
+        r""" Compress the move stack """
+        if len(self._buf) < MoveStack._COMPRESSED_SIZE: return
+        self._buf = self._buf[-MoveStack._COMPRESSED_SIZE:]
 
     def __getitem__(self, item: int) -> Move:
         return self._buf[item]

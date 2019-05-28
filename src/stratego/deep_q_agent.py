@@ -174,17 +174,25 @@ class ReplayStateTuple:
 
     _next_move_empty: bool = None
 
+    def compress_movestack(self) -> None:
+        r""" Compress the MoveStack to save space and make copies faster """
+        self.s.compress_movestack()
+
     def is_terminal(self) -> bool:
         r""" Returns True if this state is terminal """
         for x in DeepQAgent.TERMINAL_REWARDS:
             if self.r.equal(x): return True
         return False
 
-    def is_s_p_move_empty(self) -> bool:
-        r""" Memoize whether \p MoveSet empty to prevent rechecking """
-        if self._next_move_empty is None:
-            self._next_move_empty = self.s_p.is_next_moves_empty()
-        return self._next_move_empty
+    def create_s_p(self) -> None:
+        r""" Create the successor state if needed """
+        if self.s_p is not None: return
+
+        self.s_p = copy.deepcopy(self.s)
+        self.s_p.update(self.a)
+        # Empty move stack if cyclic moves may make it appear as there are no moves
+        if self.s_p.is_next_moves_unavailable():
+            self.s_p.empty_movestack()
 
 
 class ReplayMemory:
@@ -438,8 +446,11 @@ class DeepQAgent(Agent, nn.Module):
         logging.info("Starting episode %d of %d", self._episode, self._M)
         progress_bar = tqdm(range(self._T), total=self._T, file=sys.stdout, disable=IS_TALAPAS)
         for i in progress_bar:
-            # With probability < \epsilon, select a random action
-            if not t.s.is_next_moves_empty():
+            if t.s.is_next_moves_unavailable():
+                t.s.partial_empty_movestack()
+            # If no moves whatsoever, then game over
+            if t.s.has_next_any_moves():
+                # With probability < \epsilon, select a random action
                 if random.random() < self._eps:
                     t.a = t.s.next_player.get_random_move()
                     num_rand_moves += 1
@@ -450,11 +461,13 @@ class DeepQAgent(Agent, nn.Module):
                 f_out.flush()
 
             # Handle case player already lost
-            if t.s.is_game_over(): t.r = self._LOSS_REWARD
+            if t.s.is_game_over(allow_move_cycle=True): t.r = self._LOSS_REWARD
             # Player about to win
             elif t.a.is_game_over(): t.r = self._WIN_REWARD
             # Game not over yet
             else: t.r = self._NON_TERMINAL_MOVE_REWARD
+
+            t.compress_movestack()
             self._replay.add(t)
 
             j_arr = self._replay.get_random()
@@ -467,11 +480,9 @@ class DeepQAgent(Agent, nn.Module):
                 if j.is_terminal(): continue
 
                 # Only time update to save time
-                if j.s_p is None:
-                    j.s_p = copy.deepcopy(j.s)
-                    j.s_p.update(j.a)
+                j.create_s_p()
 
-                if j.is_s_p_move_empty():
+                if not j.s.has_next_any_moves():
                     y_j[idx] = DeepQAgent._WIN_REWARD
                 else:
                     # ToDo Need to fix how board state measured since player changed after move
@@ -484,7 +495,7 @@ class DeepQAgent(Agent, nn.Module):
             self._optim.step()
 
             # Advance to next state
-            if t.s.is_game_over():
+            if t.s.is_game_over(allow_move_cycle=True):
                 progress_bar.close()
                 break
             t.s.update(t.a)
@@ -494,7 +505,7 @@ class DeepQAgent(Agent, nn.Module):
         if t.s.is_game_over():
             logging.debug("Episode %d: Winner is %s", self._episode, t.s.get_winner().name)
             if t.s.was_flag_attacked(): msg = "Flag was attacked"
-            elif t.s.is_next_moves_empty(): msg = "Other player had no moves"
+            elif t.s.is_next_moves_unavailable(): msg = "Other player had no moves"
             else: msg = "Unknown "
             logging.debug("Victory Condition: %s", msg)
 

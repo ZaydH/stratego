@@ -350,12 +350,13 @@ class State:
                     return True
         return False
 
-    def is_game_over(self) -> bool:
+    def is_game_over(self, allow_move_cycle: bool = False) -> bool:
         r""" Returns True if the game has ended """
         # Last move attacked flag
-        if not self._stack.is_empty() and self._stack.top().is_game_over(): return True
+        if self.was_flag_attacked(): return True
         # Current player has no moves
-        return self.next_player.move_set.is_empty(self.get_cyclic_move())
+        if allow_move_cycle: return not self.has_next_any_moves()
+        return self.is_next_moves_unavailable()
 
     def get_winner(self) -> Optional[Color]:
         r""" Gets the color of the winning player """
@@ -363,12 +364,31 @@ class State:
             return None
         if self.was_flag_attacked():
             return self._stack.top().piece.color
-        if self.is_next_moves_empty():
+        if self.is_next_moves_unavailable():
             return self.other_player.color
         raise RuntimeError("Not able to determine winner")
 
-    def is_next_moves_empty(self) -> bool:
-        r""" Return \p True if the next player has no moves """
+    def partial_empty_movestack(self) -> None:
+        r""" Empties the move stack. """
+        self._stack.partial_empty()
+
+    def empty_movestack(self) -> None:
+        r""" Empties the move stack. """
+        self._stack.empty()
+
+    def compress_movestack(self) -> None:
+        r""" Compresses the move stack for any unnecessary information """
+        self._stack.compress()
+
+    def has_next_any_moves(self) -> bool:
+        r"""
+        Return \p True if the next player has no moves WHATSOEVER.  Cyclic moves still count as
+        moves so if the player has only cyclic moves this function still returns \p True.
+        """
+        return not self.next_player.move_set.is_empty()
+
+    def is_next_moves_unavailable(self) -> bool:
+        r""" Return \p True if the next player has no available moves """
         return self.next_player.move_set.is_empty(self.get_cyclic_move())
 
     def was_flag_attacked(self) -> bool:
