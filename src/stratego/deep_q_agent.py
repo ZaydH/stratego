@@ -298,7 +298,7 @@ class DeepQAgent(Agent, nn.Module):
 
         self._episode = 0
         self._optim = optim.Adam(self.parameters(), lr=DeepQAgent._LR_START)
-        self._lr_sched = optim.lr_scheduler.MultiStepLR(self._optim, milestones=[1000, 2000, 3000],
+        self._lr_sched = optim.lr_scheduler.MultiStepLR(self._optim, milestones=[1000, 5000],
                                                         gamma=0.1)
 
         for model_path in [DeepQAgent._EXPORTED_MODEL, DeepQAgent._TRAIN_BEST_MODEL]:
