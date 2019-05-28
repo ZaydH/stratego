@@ -430,16 +430,13 @@ class DeepQAgent(Agent, nn.Module):
         progress_bar = tqdm(range(self._T), total=self._T, file=sys.stdout, disable=IS_TALAPAS)
         for i in progress_bar:
             # With probability < \epsilon, select a random action
-            if not t.s.next_player.move_set.is_empty(t.s.get_cyclic_move()):
+            if not t.s.is_next_moves_empty():
                 if random.random() < self._eps:
                     t.a = t.s.next_player.get_random_move()
                     num_rand_moves += 1
                 # Select (epsilon-)greedy action
                 else:
                     _, t.a = self._get_state_move(t)
-                    # if t.a.piece is None and self._episode <= 20:
-                    #     t.a = t.s.next_player.get_random_move()
-                    #     num_rand_moves += 1
                 f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
                 f_out.flush()
 
@@ -457,17 +454,18 @@ class DeepQAgent(Agent, nn.Module):
             y_j = torch.cat(reward_arr, dim=0)
             q_j = torch.zeros_like(y_j, dtype=TensorDType)
             for idx, j in enumerate(j_arr):
-                if not j.is_terminal():
-                    j.s.update(j.a)
-                    if j.s.next_player.move_set.is_empty(j.s.get_cyclic_move()):
-                        y_j[idx] = DeepQAgent._WIN_REWARD
-                    else:
-                        # ToDo Need to fix how board state measured since player changed after move
-                        y_j_1_val, _ = self._get_state_move(j)
-                        y_j[idx] = y_j[idx] - self._gamma * y_j_1_val
-                        # ToDo may need to rollback multiple moves
-                    j.s.rollback()
                 q_j[idx] = self._get_action_output_score(j)
+                if j.is_terminal(): continue
+
+                j.s.update(j.a)
+                if j.s.is_next_moves_empty():
+                    y_j[idx] = DeepQAgent._WIN_REWARD
+                else:
+                    # ToDo Need to fix how board state measured since player changed after move
+                    y_j_1_val, _ = self._get_state_move(j)
+                    y_j[idx] -= self._gamma * y_j_1_val
+                    # ToDo may need to rollback multiple moves
+                j.s.rollback()
             loss = self._f_loss(y_j, q_j)
             self._optim.zero_grad()
             loss.backward()
@@ -484,7 +482,7 @@ class DeepQAgent(Agent, nn.Module):
         if t.s.is_game_over():
             logging.debug("Episode %d: Winner is %s", self._episode, t.s.get_winner().name)
             if t.s.was_flag_attacked(): msg = "Flag was attacked"
-            elif t.s.does_next_have_moves(): msg = "Other player had no moves"
+            elif t.s.is_next_moves_empty(): msg = "Other player had no moves"
             else: msg = "Unknown "
             logging.debug("Victory Condition: %s", msg)
 
