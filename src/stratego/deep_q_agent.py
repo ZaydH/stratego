@@ -482,7 +482,7 @@ class DeepQAgent(Agent, nn.Module):
                 # Only time update to save time
                 j.create_s_p()
 
-                if not j.s.has_next_any_moves():
+                if not j.s_p.has_next_any_moves():
                     y_j[idx] = DeepQAgent._WIN_REWARD
                 else:
                     # ToDo Need to fix how board state measured since player changed after move
