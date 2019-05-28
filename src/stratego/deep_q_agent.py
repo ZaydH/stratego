@@ -87,7 +87,7 @@ def _build_policy_head(in_planes: int, out_planes: int, board_dim: Tuple[int, in
 
     # Number of inputs into the feedforward network
     num_hidden_layers = 2
-    hidden_dim = 512
+    hidden_dim = 128
     prev_in_dim = out_planes * functools.reduce(op.mul, board_dim, 1)
     for i in range(num_hidden_layers):
         seq.add_module("FF_Lin_%02d" % i, nn.Linear(prev_in_dim, hidden_dim))
