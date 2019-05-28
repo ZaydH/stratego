@@ -295,10 +295,12 @@ class DeepQAgent(Agent, nn.Module):
 
         self._construct_network()
         self._replay = None
-        if not disable_import and DeepQAgent._EXPORTED_MODEL.exists():
-            msg = "Importing saved model: \"%s\"" % str(DeepQAgent._EXPORTED_MODEL)
+        for model_path in [DeepQAgent._EXPORTED_MODEL, DeepQAgent._TRAIN_BEST_MODEL]:
+            if model_path.exists(): break
+        if not disable_import and model_path.exists():
+            msg = "Importing saved model: \"%s\"" % str(model_path)
             logging.debug("Starting: %s" % msg)
-            utils.load_module(self, DeepQAgent._EXPORTED_MODEL)
+            utils.load_module(self, model_path)
             logging.debug("COMPLETED: %s" % msg)
         # Must be last in constructor to ensure proper CUDA enabling
         if IS_CUDA: self.cuda()
