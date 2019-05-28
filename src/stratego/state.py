@@ -391,6 +391,10 @@ class State:
         r""" Return \p True if the next player has no available moves """
         return self.next_player.move_set.is_empty(self.get_cyclic_move())
 
+    def num_next_moveable_pieces(self) -> int:
+        r""" Counts the number of pieces \p next_player can move """
+        return sum(1 for p in self.next_player.pieces() if not p.is_immobile())
+
     def was_flag_attacked(self) -> bool:
         r""" Return \p if the flag was attacked """
         return not self._stack.is_empty() and self._stack.top().is_game_over()

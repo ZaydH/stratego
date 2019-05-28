@@ -144,7 +144,8 @@ class ResBlock(nn.Module):
     (6) Skip connection adding input to output of step 5
     (7) Non-linearity
     """
-    NUM_PLANES = 256  # Filters
+    # NUM_PLANES = 256  # Filters
+    NUM_PLANES = 32  # Filters
 
     def __init__(self):
         super().__init__()
@@ -505,7 +506,11 @@ class DeepQAgent(Agent, nn.Module):
         if t.s.is_game_over():
             logging.debug("Episode %d: Winner is %s", self._episode, t.s.get_winner().name)
             if t.s.was_flag_attacked(): msg = "Flag was attacked"
-            elif t.s.is_next_moves_unavailable(): msg = "Other player had no moves"
+            elif t.s.is_next_moves_unavailable():
+                next_color = t.s.next_color.name
+                n = t.s.num_next_moveable_pieces()
+                logging.debug("Losing player %s has %d moveable pieces", next_color, n)
+                msg = "Other player had no moves"
             else: msg = "Unknown "
             logging.debug("Victory Condition: %s", msg)
 
