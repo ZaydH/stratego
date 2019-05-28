@@ -231,13 +231,13 @@ class DeepQAgent(Agent, nn.Module):
     _M = 10000
     _T = 1500  # Maximum number of moves for a state
     _EPS_START = 0.5
-    _gamma = 0.995
+    _gamma = 0.98
     # _LR_START = 0.2
-    _LR_START = 0.02
+    _LR_START = 2E-3
     _f_loss = nn.MSELoss()
     _LOSS_REWARD = -torch.ones((1, 2))  # Must be -1 since output is tanh
     _INVALID_MOVE_REWARD = _LOSS_REWARD
-    _NON_TERMINAL_MOVE_REWARD = torch.full_like(_LOSS_REWARD, -1E-4)
+    _NON_TERMINAL_MOVE_REWARD = torch.full_like(_LOSS_REWARD, -3E-3)
     _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
 
     TERMINAL_REWARDS = (_LOSS_REWARD, _WIN_REWARD, _INVALID_MOVE_REWARD)
@@ -483,6 +483,10 @@ class DeepQAgent(Agent, nn.Module):
         # Print the color of the winning player
         if t.s.is_game_over():
             logging.debug("Episode %d: Winner is %s", self._episode, t.s.get_winner().name)
+            if t.s.was_flag_attacked(): msg = "Flag was attacked"
+            elif t.s.does_next_have_moves(): msg = "Other player had no moves"
+            else: msg = "Unknown "
+            logging.debug("Victory Condition: %s", msg)
 
         logging.info("COMPLETED episode %d of %d", self._episode, self._M)
         # noinspection PyUnboundLocalVariable

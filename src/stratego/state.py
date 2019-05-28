@@ -361,11 +361,19 @@ class State:
         r""" Gets the color of the winning player """
         if not self.is_game_over():
             return None
-        if not self._stack.is_empty() and self._stack.top().is_game_over():
+        if self.was_flag_attacked():
             return self._stack.top().piece.color
-        if self.next_player.move_set.is_empty(self.get_cyclic_move()):
+        if self.does_next_have_moves():
             return self.other_player.color
         raise RuntimeError("Not able to determine winner")
+
+    def does_next_have_moves(self) -> bool:
+        r""" Return \p True if the next player has no moves """
+        return self.next_player.move_set.is_empty(self.get_cyclic_move())
+
+    def was_flag_attacked(self) -> bool:
+        r""" Return \p if the flag was attacked """
+        return not self._stack.is_empty() and self._stack.top().is_game_over()
 
     def write_board(self) -> str:
         r""" Return the board contents as a string """
