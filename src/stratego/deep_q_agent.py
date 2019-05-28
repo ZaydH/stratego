@@ -530,7 +530,7 @@ class DeepQAgent(Agent, nn.Module):
         f_max = max_move / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES
         logging.debug("Episode %d: Halted due to max moves frequency %.3f", self._episode, f_max)
 
-        if 0.5 <= denom:
+        if 0.5 <= win_freq:
             logging.debug("Head to Head: Backing up new best model")
             utils.save_module(self, DeepQAgent._TRAIN_BEST_MODEL)
         else:
