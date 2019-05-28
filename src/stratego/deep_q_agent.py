@@ -391,6 +391,7 @@ class DeepQAgent(Agent, nn.Module):
         else:
             bypass_first_head_to_head = True
 
+        self.train()
         self._replay = ReplayMemory()
 
         num_rem_episodes = self._M - self._episode
@@ -533,6 +534,7 @@ class DeepQAgent(Agent, nn.Module):
         else:
             logging.debug("Head to Head: Restore previous best model")
             utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
+        self.train()
         logging.debug("COMPLETED: %s", msg)
 
     # def _punish_invalid_move(self, state_tuple: ReplayStateTuple) -> None:
