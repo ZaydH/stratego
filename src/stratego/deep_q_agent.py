@@ -471,15 +471,16 @@ class DeepQAgent(Agent, nn.Module):
         f_out.close()
 
         # Print the color of the winning player
-        if t.s.is_game_over():
+        if t.a.is_game_over() or t.s.is_next_moves_unavailable():
             logging.debug("Episode %d: Winner is %s", self._episode, t.s.get_winner().name)
-            if t.a.is_game_over(): msg = "Flag was attacked"
+            if t.a.is_game_over():
+                msg = "Flag was attacked"
             elif t.s.is_next_moves_unavailable():
                 next_color = t.s.next_color.name
                 n = t.s.num_next_moveable_pieces()
                 logging.debug("Losing player %s has %d moveable pieces", next_color, n)
                 msg = "Other player had no moves"
-            else: msg = "Unknown "
+            else: msg = "Unknown termination condition"
             logging.debug("Victory Condition: %s", msg)
 
         logging.debug("Episode %d: Number of Total Moves = %d", self._episode, tot_num_moves)
