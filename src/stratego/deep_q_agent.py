@@ -629,6 +629,7 @@ class DeepQAgent(Agent, nn.Module):
 
         backup_epsilon = self._eps
         max_move = num_wins = 0
+        cur_flag_att = prev_flag_att = 0
         for _ in range(DeepQAgent._NUM_HEAD_TO_HEAD_GAMES):
             game = Game(self._brd, copy.deepcopy(s0), None)
             if random.random() < 0.5:
@@ -642,21 +643,34 @@ class DeepQAgent(Agent, nn.Module):
 
             prev = DeepQAgent(game.board, prev_col, game.state, disable_import=True)
             utils.load_module(prev, DeepQAgent._TRAIN_BEST_MODEL)
-            prev._make_rand_move_prob = prev._eps
+            prev._make_rand_move_prob = cur._eps  # Use same randomness so fair comparison
 
-            winner = game.two_agent_automated(cur, prev, wait_time=0,
-                                              max_num_moves=4000, display=False)
+            winner, flag_attacked = game.two_agent_automated(cur, prev, wait_time=0,
+                                                             max_num_moves=4000, display=False)
             if winner == cur.color:
                 num_wins += 1
+            elif winner is None:
+                max_move += 1
+            if winner == cur.color:
+                num_wins += 1
+                if flag_attacked: cur_flag_att += 1
+            elif flag_attacked:
+                prev_flag_att += 1
             elif winner is None:
                 max_move += 1
 
         max_timeouts_to_consider = 5
         denom = DeepQAgent._NUM_HEAD_TO_HEAD_GAMES - min(max_timeouts_to_consider, max_move)
         win_freq = num_wins / denom
+        n = DeepQAgent._NUM_HEAD_TO_HEAD_GAMES
+        logging.debug("Episode %d: Total Number Games %d", self._episode, n)
         logging.debug("Episode %d: Head to head win frequency %.3f", self._episode, win_freq)
         f_max = max_move / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES
         logging.debug("Episode %d: Halted due to max moves frequency %.3f", self._episode, f_max)
+        tot_flag_att = cur_flag_att + prev_flag_att
+        logging.debug("Episode %d: Total flag attacks: %d", self._episode, tot_flag_att)
+        logging.debug("Episode %d: Current Deep-Q flag attacks: %d", self._episode, cur_flag_att)
+        logging.debug("Episode %d: Previous Deep-Q flag attacks: %d", self._episode, prev_flag_att)
 
         if 0.5 <= win_freq:
             logging.debug("Head to Head: Backing up new best model")
@@ -1068,6 +1082,7 @@ def compare_deep_q_versus_random(brd_file: PathOrStr, state_file: PathOrStr, num
     s0 = State.importer(state_file, brd)
 
     max_move = num_wins = 0
+    deep_q_flag_attack = rand_flag_attack = 0
     for _ in range(num_head_to_head):
         game = Game(brd, copy.deepcopy(s0), None)
         if random.random() < 0.5:
@@ -1079,13 +1094,20 @@ def compare_deep_q_versus_random(brd_file: PathOrStr, state_file: PathOrStr, num
         deep_q_agent._make_rand_move_prob = 0
         rand_agent = RandomAgent(rand_col)
 
-        winner = game.two_agent_automated(deep_q_agent, rand_agent, wait_time=0,
-                                          max_num_moves=4000, display=False)
+        winner, flag_attacked = game.two_agent_automated(deep_q_agent, rand_agent, wait_time=0,
+                                                         max_num_moves=4000, display=False)
         if winner == deep_q_agent.color:
             num_wins += 1
+            if flag_attacked: deep_q_flag_attack += 1
+        elif flag_attacked:
+            rand_flag_attack += 1
         elif winner is None:
             max_move += 1
 
     win_freq = num_wins / num_head_to_head
+    logging.debug("Total Number of Games: %d", num_head_to_head)
     logging.debug("Head to head win frequency %.3f", win_freq)
     logging.debug("Halted due to max moves frequency %.3f", max_move / num_head_to_head)
+    logging.debug("Total flag attacks: %d", rand_flag_attack + deep_q_flag_attack)
+    logging.debug("Deep-Q flag attacks: %d", deep_q_flag_attack)
+    logging.debug("Random flag attacks: %d", rand_flag_attack)

@@ -119,7 +119,7 @@ class Game:
 
     def two_agent_automated(self, a1: Agent, a2: Agent, wait_time: float = 0,
                             display: bool = False, max_num_moves: Optional[int] = None,
-                            moves_output_file: Optional[PathOrStr] = None) -> Optional[Color]:
+                            move_f_out: Optional[PathOrStr] = None) -> Tuple[Optional[Color], bool]:
         r"""
         Simple interface to play
 
@@ -128,7 +128,9 @@ class Game:
         :param wait_time: Time (in seconds) to wait between moves.  Must be non-negative
         :param display: If True, display information about the move and the board
         :param max_num_moves: Maximum number of moves to perform before existing.
-        :param moves_output_file: Path to write the moves made
+        :param move_f_out: Path to write the moves made
+        :return: Tuple of the winning player's color (if any) and \p True if the win as due to a
+                 flag being attacked.
         """
         assert a1.color != a2.color, "Both agents cannot be the same color"
 
@@ -143,15 +145,17 @@ class Game:
             print("")
             if wait_time > 0: time.sleep(wait_time)
 
-        w_move = moves_output_file is not None
+        w_move = move_f_out is not None
         if w_move:
-            f_out = open(moves_output_file, "w+")
+            f_out = open(move_f_out, "w+")
             # Add header row for improved file readability
             f_out.write("# PlayerColor,StartLoc,EndLoc")
 
         num_moves = 0
         cur, other = (a1, a2) if a1.color == self._state.next_player.color else (a2, a1)
-        while num_moves < max_num_moves and not self._state.is_game_over():
+        while num_moves < max_num_moves and not self._state.is_game_over(allow_move_cycle=True):
+            if self._state.is_next_moves_unavailable():
+                self._state.partial_empty_movestack()
             m = cur.get_next_move()
             if w_move:
                 # noinspection PyUnboundLocalVariable
@@ -163,16 +167,16 @@ class Game:
             cur, other = other, cur
             num_moves += 1
 
-        if w_move:
-            f_out.close()
+        if w_move: f_out.close()
         if self._state.is_game_over():
             if display:
                 print("Game over.  Player", other.color.name, "won")
                 print("Number of Moves:", num_moves)
-            return self._state.other_player.color
+            # noinspection PyUnboundLocalVariable
+            return self._state.other_player.color, m.is_game_over()
         elif num_moves == max_num_moves:
             print("Maximum number of moves %d reached. Exiting." % max_num_moves)
-        return None
+        return None, False
 
     def _execute_move_file(self, moves_file: PathOrStr, display_after_move: bool = False) -> None:
         r"""
