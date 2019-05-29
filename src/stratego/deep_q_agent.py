@@ -33,7 +33,7 @@ from .board import Board, ToEdgeLists
 from .piece import Piece, Rank
 from .player import Player
 from .state import State
-from .utils import EXPORT_DIR, PathOrStr
+from .utils import EXPORT_DIR, SERIALIZE_DIR, PathOrStr
 
 IS_CUDA = torch.cuda.is_available()
 TensorDType = torch.float32
@@ -498,7 +498,7 @@ class DeepQAgent(Agent, nn.Module):
         Fill move buffer with initially fully random moves.  The function supports serializing the
         move buffer to disk so it does not need to be recreated on each run.
         """
-        export_path = EXPORT_DIR / "_initial_move_buffer.pk"
+        export_path = SERIALIZE_DIR / ("_initial_move_buffer_%04d.pk" % num_episodes)
         if export_path.exists():
             # Serialize the initial move buffer
             with open(export_path, "rb") as pk_in:
@@ -522,7 +522,7 @@ class DeepQAgent(Agent, nn.Module):
                 logging.info("COMPLETED: %s", msg)
 
         self._replay.make_all_s_p()
-        EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        SERIALIZE_DIR.mkdir(parents=True, exist_ok=True)
         # Serialize the initial move buffer
         with open(export_path, "wb") as pk_out:
             pickle.dump(self._replay, pk_out)

@@ -26,6 +26,7 @@ def _check_is_talapas() -> bool:
 
 
 IS_TALAPAS = _check_is_talapas()
+SERIALIZE_DIR = EXPORT_DIR if not IS_TALAPAS else Path("/home/zhammoud/projects/serialize")
 
 
 def setup_logger(quiet_mode: bool = False, filename: PathOrStr = "test.log",
