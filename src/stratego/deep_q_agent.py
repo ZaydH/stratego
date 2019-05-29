@@ -463,7 +463,10 @@ class DeepQAgent(Agent, nn.Module):
             self._update_network(moves_in_round)
 
             # Advance to next state
-            if tot_num_moves >= self._T or t.s.is_game_over(allow_move_cycle=True):
+            if tot_num_moves >= self._T:
+                logging.debug("Maximum number of moves exceeded")
+                break
+            if t.a.is_game_over() or t.s.is_game_over(allow_move_cycle=True):
                 break
         f_out.close()
 
