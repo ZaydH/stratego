@@ -237,8 +237,14 @@ class ReplayMemory:
         Pre-create the s' states for all elements in the buffer.  This is useful when creating the
         random pre-move buffer.
         """
+        msg = "Creating all replay buffer s_p objects"
+        logging.info("Starting: %s" % msg)
         for x in self._buf:
             x.create_s_p()
+        logging.info("COMPLETED: %s" % msg)
+
+    def __len__(self) -> int:
+        return len(self._buf)
 
 
 class DeepQAgent(Agent, nn.Module):
@@ -411,8 +417,6 @@ class DeepQAgent(Agent, nn.Module):
 
     def train_network(self, s_0: State):
         r""" Train the agent """
-        # Move.DISABLE_ASSERT_CHECKS = True
-
         s_0.is_training = True
 
         # If a trained model exists, load it. Otherwise, backup the default model
@@ -482,8 +486,8 @@ class DeepQAgent(Agent, nn.Module):
                     msg, winner = "Other player had no moves", t.s.get_winner().name
                 else:
                     msg, winner = "Unknown termination condition", "Unknown"
-                logging.debug("Victory Condition: %s", msg)
                 logging.debug("Episode %d: Winner is %s", self._episode, winner)
+                logging.debug("Victory Condition: %s", msg)
                 break
         f_out.close()
 
@@ -500,9 +504,12 @@ class DeepQAgent(Agent, nn.Module):
         """
         export_path = SERIALIZE_DIR / ("_initial_move_buffer_%04d.pk" % num_episodes)
         if export_path.exists():
+            msg = "Loading initial move buffer: \"%s\"" % export_path
+            logging.info("Starting: %s" % msg)
             # Serialize the initial move buffer
             with open(export_path, "rb") as pk_in:
                 self._replay = pickle.load(pk_in)
+            logging.info("COMPLETED: %s" % msg)
             return
 
         for i in range(1, num_episodes + 1):
@@ -585,19 +592,21 @@ class DeepQAgent(Agent, nn.Module):
 
                 # Only time update to save time
                 j.create_s_p()
-
+                # If opponent has no moves, overwrite reward as true reward not visible until update
                 if not j.s_p.has_next_any_moves():
-                    y_j[idx] = DeepQAgent._WIN_REWARD
+                    y_j[idx] = j.r = DeepQAgent._WIN_REWARD
                     continue
                 # Get next move
                 _, a_p = self._get_state_move(j.s_p, j.base_tensor)
+                # If other play won, overwrite as true reward not originally visible
+                # No need to make move guaranteed to end the game so just skip update/rollback
                 if a_p.is_game_over():
-                    y_j[idx] = DeepQAgent._LOSS_REWARD
+                    y_j[idx] = j.r = DeepQAgent._LOSS_REWARD
                     continue
 
                 j.s_p.update(a_p)
                 if j.s_p.is_game_over(allow_move_cycle=True):
-                    y_j[idx] = DeepQAgent._LOSS_REWARD
+                    y_j[idx] = j.r = DeepQAgent._LOSS_REWARD
                 else:
                     if j.s_p.is_next_moves_unavailable():
                         j.s_p.partial_empty_movestack()
@@ -618,6 +627,7 @@ class DeepQAgent(Agent, nn.Module):
         msg = "Head to head agent competition for episode %d" % self._episode
         logging.debug("Starting: %s", msg)
 
+        backup_epsilon = self._eps
         max_move = num_wins = 0
         for _ in range(DeepQAgent._NUM_HEAD_TO_HEAD_GAMES):
             game = Game(self._brd, copy.deepcopy(s0), None)
@@ -654,9 +664,7 @@ class DeepQAgent(Agent, nn.Module):
         else:
             logging.debug("Head to Head: Restore previous best model")
             utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
-            # Restore epsilon
-            # noinspection PyUnboundLocalVariable
-            self._eps = prev._eps
+            self._eps = backup_epsilon
         self.train()
         logging.debug("COMPLETED: %s", msg)
 
