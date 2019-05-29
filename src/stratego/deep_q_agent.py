@@ -509,10 +509,11 @@ class DeepQAgent(Agent, nn.Module):
                             y_j_1_val = DeepQAgent._LOSS_REWARD
                         else:
                             j.s_p.update(a_p)
-                            if t.s.is_game_over(allow_move_cycle=True):
+                            if j.s_p.is_game_over(allow_move_cycle=True):
                                 y_j_1_val = DeepQAgent._LOSS_REWARD
                             else:
-                                if j.s_p.is_next_moves_unavailable(): j.s_p.partial_empty()
+                                if j.s_p.is_next_moves_unavailable():
+                                    j.s_p.partial_empty_movestack()
                                 with torch.no_grad():
                                     y_j_1_val, _ = self._get_state_move(j.s_p, j.base_tensor)
                             j.s_p.rollback()
