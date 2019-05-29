@@ -225,8 +225,8 @@ class ReplayMemory:
         self._next += 1
         if self._next == self._N: self._next = 0
 
-    # def get_random(self, batch_size=32) -> List[ReplayStateTuple]:
-    def get_random(self, batch_size=8) -> List[ReplayStateTuple]:
+    def get_random(self, batch_size=32) -> List[ReplayStateTuple]:
+    # def get_random(self, batch_size=8) -> List[ReplayStateTuple]:
         r""" Select a random element from the replay memory """
         if len(self._buf) < batch_size:
             return self._buf
@@ -493,7 +493,7 @@ class DeepQAgent(Agent, nn.Module):
         logging.debug("Episode %d: Frac. Moves Random = %.4f", self._episode, f_rand)
         logging.info("COMPLETED episode %d of %d", self._episode, self._M)
 
-    def _fill_initial_move_buffer(self, s_0: State, num_episodes: int = 5000, max_moves: int = 700):
+    def _fill_initial_move_buffer(self, s_0: State, num_episodes: int = 500, max_moves: int = 700):
         r"""
         Fill move buffer with initially fully random moves.  The function supports serializing the
         move buffer to disk so it does not need to be recreated on each run.
