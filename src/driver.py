@@ -1,7 +1,7 @@
 import sys
 
 from stratego import Game
-from stratego.deep_q_agent import DeepQAgent
+from stratego.deep_q_agent import DeepQAgent, compare_deep_q_versus_random
 # noinspection PyUnresolvedReferences
 from stratego.human_agent import HumanAgent
 from stratego.printer import Printer
@@ -56,6 +56,10 @@ def _main_deep_q_vs_human():
     game.two_agent_automated(a1, a2, display=True, moves_output_file="moves.txt")
 
 
+def _main_deep_q_vs_rand():
+    compare_deep_q_versus_random("boards/small.txt", "states/test_debug.txt", 101)
+
+
 def _main_make_moves(moves_file: PathOrStr, display_after_move: bool = False):
     game = Game("boards/small.txt", "states/test_debug.txt", visibility=Printer.Visibility.ALL)
     # noinspection PyProtectedMember
@@ -73,6 +77,7 @@ def _main():
     # _main_hard_coded()
     # _main_random()
     # _main_make_moves("moves.txt")
+    # _main_deep_q_vs_rand()
     if len(sys.argv) > 1:
         _main_deep_q_vs_human()
     else:

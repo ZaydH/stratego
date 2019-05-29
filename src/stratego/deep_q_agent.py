@@ -14,6 +14,7 @@ import itertools
 import logging
 import operator as op
 import random
+from pathlib import Path
 from typing import Tuple, Iterable, Union, List
 from dataclasses import dataclass
 
@@ -24,13 +25,14 @@ from torch import Tensor
 import torch.nn as nn
 import torch.optim as optim
 
+from stratego.random_agent import RandomAgent
 from . import Location, Move, utils, Game
 from .agent import Agent
 from .board import Board, ToEdgeLists
 from .piece import Piece, Rank
 from .player import Player
 from .state import State
-from .utils import EXPORT_DIR
+from .utils import EXPORT_DIR, PathOrStr
 
 IS_CUDA = torch.cuda.is_available()
 TensorDType = torch.float32
@@ -323,10 +325,10 @@ class DeepQAgent(Agent, nn.Module):
         for model_path in [DeepQAgent._EXPORTED_MODEL, DeepQAgent._TRAIN_BEST_MODEL]:
             if model_path.exists(): break
         if not disable_import and model_path.exists():
-            msg = "Importing saved model: \"%s\"" % str(model_path)
-            logging.debug("Starting: %s" % msg)
+            # msg = "Importing saved model: \"%s\"" % str(model_path)
+            # logging.debug("Starting: %s" % msg)
             utils.load_module(self, model_path)
-            logging.debug("COMPLETED: %s" % msg)
+            # logging.debug("COMPLETED: %s" % msg)
         # Must be last in constructor to ensure proper CUDA enabling
         if IS_CUDA: self.cuda()
 
@@ -541,12 +543,11 @@ class DeepQAgent(Agent, nn.Module):
             else: msg = "Unknown "
             logging.debug("Victory Condition: %s", msg)
 
-        logging.info("COMPLETED episode %d of %d", self._episode, self._M)
-        # noinspection PyUnboundLocalVariable
         logging.debug("Episode %d: Number of Total Moves = %d", self._episode, tot_num_moves)
         logging.debug("Episode %d: Number of Random Moves = %d", self._episode, num_rand_moves)
         f_rand = num_rand_moves / tot_num_moves
         logging.debug("Episode %d: Frac. Moves Random = %.4f", self._episode, f_rand)
+        logging.info("COMPLETED episode %d of %d", self._episode, self._M)
 
     def _compare_head_to_head(self, s0: State):
         r""" Test if the current agent is better head to head than previous one """
@@ -1023,3 +1024,44 @@ class DeepQAgent(Agent, nn.Module):
             #     x[0, DeepQAgent._next_turn_layer, p.loc.r, p.loc.c] = color_val
             # ToDo Need to update when imperfect information
         return x
+
+
+def compare_deep_q_versus_random(brd_file: PathOrStr, state_file: PathOrStr, num_head_to_head: int):
+    r"""
+    Compares the Deep-Q agent to a random learner
+
+    :param brd_file: Path to the board file
+    :param state_file: Path to the state file
+    :param num_head_to_head: Number of head to head games
+    """
+    if not isinstance(brd_file, Path): brd_file = Path(brd_file)
+    if not isinstance(state_file, Path): state_file = Path(state_file)
+
+    msg = "Head to head agent competition of Deep-Q versus Random"
+    logging.debug("Starting: %s", msg)
+
+    brd = Board.importer(brd_file)
+    s0 = State.importer(state_file, brd)
+
+    max_move = num_wins = 0
+    for _ in range(num_head_to_head):
+        game = Game(brd, copy.deepcopy(s0), None)
+        if random.random() < 0.5:
+            deep_q_col, rand_col = game.red, game.blue
+        else:
+            deep_q_col, rand_col = game.blue, game.red
+
+        deep_q_agent = DeepQAgent(game.board, deep_q_col, game.state)
+        deep_q_agent._make_rand_move_prob = 0
+        rand_agent = RandomAgent(rand_col)
+
+        winner = game.two_agent_automated(deep_q_agent, rand_agent, wait_time=0,
+                                          max_num_moves=4000, display=False)
+        if winner == deep_q_agent.color:
+            num_wins += 1
+        elif winner is None:
+            max_move += 1
+
+    win_freq = num_wins / num_head_to_head
+    logging.debug("Head to head win frequency %.3f", win_freq)
+    logging.debug("Halted due to max moves frequency %.3f", max_move / num_head_to_head)
