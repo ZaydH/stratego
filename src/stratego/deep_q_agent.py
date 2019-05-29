@@ -414,6 +414,7 @@ class DeepQAgent(Agent, nn.Module):
 
         self.train()
         self._replay = ReplayMemory()
+        self._fill_initial_move_buffer(copy.deepcopy(s_0))
 
         num_rem_episodes = self._M - self._episode
         eps_range = np.linspace(self._eps, self._EPS_END, num=num_rem_episodes, endpoint=True)
@@ -482,6 +483,23 @@ class DeepQAgent(Agent, nn.Module):
         f_rand = num_rand_moves / tot_num_moves
         logging.debug("Episode %d: Frac. Moves Random = %.4f", self._episode, f_rand)
         logging.info("COMPLETED episode %d of %d", self._episode, self._M)
+
+    def _fill_initial_move_buffer(self, s_0: State, num_episodes: int = 101):
+        r""" Fill move buffer with initially fully random moves """
+        for i in range(1, num_episodes + 1):
+            msg = "Initial population of random replay buffer step %d of %d" % (i, num_episodes)
+            logging.info("Starting: %s", msg)
+            t = ReplayStateTuple(s=copy.deepcopy(s_0),
+                                 base_tensor=DeepQAgent._build_base_tensor(s_0.board, self.d_in))
+
+            tot_num_moves = num_rand_moves = 0
+            while not t.a.is_game_over() and not t.s.is_game_over(allow_move_cycle=True):
+                t, moves_in_round, rand_moves_in_round = self._play_moves(t)
+                tot_num_moves += moves_in_round
+                num_rand_moves += rand_moves_in_round
+
+                if tot_num_moves >= self._T: break
+            logging.info("COMPLETED: %s", msg)
 
     def _play_moves(self, t: ReplayStateTuple, f_out) -> Tuple[ReplayStateTuple, int, int]:
         r"""
