@@ -13,9 +13,10 @@ import functools
 import itertools
 import logging
 import operator as op
+import pickle
 import random
 from pathlib import Path
-from typing import Tuple, Iterable, Union, List
+from typing import Tuple, Iterable, Union, List, Optional
 from dataclasses import dataclass
 
 import numpy as np
@@ -203,7 +204,7 @@ class ReplayMemory:
     _N = 1000000
 
     def __init__(self):
-        self._buf = []
+        self._buf = []  # type: List[ReplayStateTuple]
         self._next = 0
 
     def add(self, s: ReplayStateTuple) -> None:
@@ -230,6 +231,14 @@ class ReplayMemory:
         if len(self._buf) < batch_size:
             return self._buf
         return np.random.choice(self._buf, size=batch_size, replace=False)
+
+    def make_all_s_p(self) -> None:
+        r"""
+        Pre-create the s' states for all elements in the buffer.  This is useful when creating the
+        random pre-move buffer.
+        """
+        for x in self._buf:
+            x.create_s_p()
 
 
 class DeepQAgent(Agent, nn.Module):
@@ -316,11 +325,11 @@ class DeepQAgent(Agent, nn.Module):
         self._make_rand_move_prob = None
 
         self._construct_network()
-        self._replay = None
+        self._replay = None  # type: Optional[ReplayMemory]
 
         self._episode = 0
         self._optim = optim.Adam(self.parameters(), lr=DeepQAgent._LR_START)
-        self._lr_sched = optim.lr_scheduler.MultiStepLR(self._optim, milestones=[1000, 5000],
+        self._lr_sched = optim.lr_scheduler.MultiStepLR(self._optim, milestones=[2000, 5000],
                                                         gamma=0.1)
 
         for model_path in [DeepQAgent._EXPORTED_MODEL, DeepQAgent._TRAIN_BEST_MODEL]:
@@ -484,22 +493,39 @@ class DeepQAgent(Agent, nn.Module):
         logging.debug("Episode %d: Frac. Moves Random = %.4f", self._episode, f_rand)
         logging.info("COMPLETED episode %d of %d", self._episode, self._M)
 
-    def _fill_initial_move_buffer(self, s_0: State, num_episodes: int = 101):
-        r""" Fill move buffer with initially fully random moves """
+    def _fill_initial_move_buffer(self, s_0: State, num_episodes: int = 5000, max_moves: int = 700):
+        r"""
+        Fill move buffer with initially fully random moves.  The function supports serializing the
+        move buffer to disk so it does not need to be recreated on each run.
+        """
+        export_path = EXPORT_DIR / "_initial_move_buffer.pk"
+        if export_path.exists():
+            # Serialize the initial move buffer
+            with open(export_path, "rb") as pk_in:
+                self._replay = pickle.load(pk_in)
+            return
+
         for i in range(1, num_episodes + 1):
-            msg = "Initial population of random replay buffer step %d of %d" % (i, num_episodes)
-            logging.info("Starting: %s", msg)
             t = ReplayStateTuple(s=copy.deepcopy(s_0),
                                  base_tensor=DeepQAgent._build_base_tensor(s_0.board, self.d_in))
-
             tot_num_moves = num_rand_moves = 0
-            while not t.a.is_game_over() and not t.s.is_game_over(allow_move_cycle=True):
-                t, moves_in_round, rand_moves_in_round = self._play_moves(t)
+            while True:
+                t, moves_in_round, rand_moves_in_round = self._play_moves(t, None)
                 tot_num_moves += moves_in_round
                 num_rand_moves += rand_moves_in_round
 
-                if tot_num_moves >= self._T: break
-            logging.info("COMPLETED: %s", msg)
+                if tot_num_moves >= max_moves: break
+                if t.a.is_game_over() or t.s.is_game_over(allow_move_cycle=True): break
+
+            if i % 20 == 0:
+                msg = "Initial population of random replay buffer step %d of %d" % (i, num_episodes)
+                logging.info("COMPLETED: %s", msg)
+
+        self._replay.make_all_s_p()
+        EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        # Serialize the initial move buffer
+        with open(export_path, "wb") as pk_out:
+            pickle.dump(self._replay, pk_out)
 
     def _play_moves(self, t: ReplayStateTuple, f_out) -> Tuple[ReplayStateTuple, int, int]:
         r"""
@@ -524,8 +550,10 @@ class DeepQAgent(Agent, nn.Module):
             # Select (epsilon-)greedy action
             else:
                 _, t.a = self._get_state_move(t.s, t.base_tensor)
-            f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
-            f_out.flush()
+
+            if f_out is not None:
+                f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
+                f_out.flush()
 
             # Player about to win
             if t.a.is_game_over(): t.r = self._WIN_REWARD
