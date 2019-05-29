@@ -649,10 +649,6 @@ class DeepQAgent(Agent, nn.Module):
                                                              max_num_moves=4000, display=False)
             if winner == cur.color:
                 num_wins += 1
-            elif winner is None:
-                max_move += 1
-            if winner == cur.color:
-                num_wins += 1
                 if flag_attacked: cur_flag_att += 1
             elif flag_attacked:
                 prev_flag_att += 1
