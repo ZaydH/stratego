@@ -201,7 +201,7 @@ class ReplayMemory:
 
     Mnih et al. "Playing Atari with Deep Reinforcement Learning." (2013).
     """
-    _N = 10000
+    _N = 1000000
 
     def __init__(self):
         self._buf = []
@@ -252,7 +252,7 @@ class DeepQAgent(Agent, nn.Module):
     _EPS_START = 0.5
     _gamma = 0.98
     # _LR_START = 0.2
-    _LR_START = 2E-3
+    _LR_START = 1E-3
     _f_loss = nn.MSELoss()
     _LOSS_REWARD = -torch.ones((1, 2))  # Must be -1 since output is tanh
     _INVALID_MOVE_REWARD = _LOSS_REWARD
@@ -721,83 +721,6 @@ class DeepQAgent(Agent, nn.Module):
         # Scout move LEFT
         return idx, offset + (-c_diff - 1)
 
-    # def _convert_output_node_to_move(self, output_node: Union[Tensor, int], plyr: Player,
-    #                                  other: Player) -> Move:
-    #     r"""
-    #     Creates the \p Move object corresponding to the specified \p output_node for \p plyr
-    #     and \p other.
-    #
-    #     :param output_node: Output node number for the network
-    #     :param plyr: Player making the move
-    #     :param other: Player NOT moving this round
-    #     :return: Move corresponding to specified output node
-    #     """
-    #     assert plyr.color != other.color, "Player colors must differ"
-    #     # Handle case of input tensor for streamlining the implementation
-    #     if isinstance(output_node, Tensor):
-    #         assert all(x == 1 for x in output_node.shape), "More than one element in output_node"
-    #         output_node = int(output_node)
-    #     orig, new = self._get_locs_from_output_node(output_node)
-    #     p = plyr.get_piece_at_loc(orig)
-    #     attacked = other.get_piece_at_loc(new)
-    #     return Move(p, orig, new, attacked)
-    #
-    # def _get_output_node_from_move(self, m: Move) -> int:
-    #     r"""
-    #     Converts a move to the corresponding output node of the policy network.
-    #
-    #     :param m: Move on the board
-    #     :return: Converts a move into the corresponding node in the output layer of the policy
-    #              network
-    #     """
-    #     output_node = self._num_scout_moves() * (m.orig.r * self._brd.num_cols + m.orig.c)
-    #
-    #     if m.orig.c - m.new.c != 0:
-    #         output_node += m.new.c - (1 if m.new.c > m.orig.c else 0)
-    #     else:
-    #         output_node += self._brd.num_cols - 1  # Maximum number of horizontal moves
-    #         output_node += m.new.r - (1 if m.new.r > m.orig.r else 0)
-    #
-    #     return output_node
-
-    # def _get_locs_from_output_node(self, output_node: int) -> Tuple[Location, Location]:
-    #     r"""
-    #     Converts the output node number to a move from the original location to the new location.
-    #     The basic idea of the function is that from a given node, there are
-    #
-    #     :math:`(num_rows - 1) + (num_cols - 1)`
-    #
-    #     possible moves.  This comes from how scouts move.  Therefore, each location has a constant
-    #     number of possible moves (call that number :math:`n`) that can originate at that location.
-    #     Therefore, we can partition the output node set into :math:`\#rows \cdot \#cols` disjoint
-    #     subsets of size n.  This is how the original (source) \p Location is calculated.
-    #
-    #     The destination location is ordered by all possible horizontal moves first (starting at
-    #     column 0) and then the vertical moves next.
-    #
-    #     Separated for improved testability.
-    #
-    #     :param output_node: Identification of the output node selected to play a move
-    #     :return: Tuple of the original and new location of the move respectively.
-    #     """
-    #     if output_node < 0 or output_node >= self.d_out:
-    #         raise ValueError("output_node must be in set {0,...,d_out - 1}")
-    #
-    #     source_loc = output_node // self._num_scout_moves()
-    #     orig = Location(source_loc // self._brd.num_cols, source_loc % self._brd.num_cols)
-    #
-    #     # Calculate the destination location based on the (num_rows + num_cols - 2) choices
-    #     dest_loc = output_node % self._num_scout_moves()
-    #     row_off = col_off = 0
-    #     max_num_horz_moves = self._brd.num_cols - 1
-    #     if dest_loc < max_num_horz_moves:
-    #         col_off = (dest_loc - orig.c) + (1 if dest_loc >= orig.c else 0)
-    #     else:
-    #         dest_loc -= max_num_horz_moves
-    #         row_off = (dest_loc - orig.r) + (1 if dest_loc >= orig.r else 0)
-    #     new = orig.relative(row_off, col_off)
-    #     return orig, new
-
     def _construct_network(self):
         r""" Constructs the neural network portions of the agent. """
         self._q_net = nn.Sequential(_build_conv_block(self.d_in, ResBlock.NUM_PLANES))
@@ -846,6 +769,15 @@ class DeepQAgent(Agent, nn.Module):
 
     @staticmethod
     def _null_invalid_locations(state: State, x: Tensor, y: Tensor) -> Tensor:
+        r"""
+        Null out any locations in \p y where the current player does not have a movable piece.
+
+        :param state: Current state of the game
+        :param x: Input vector to the neural network
+        :param y: Q vector
+        :return: Modified version of \p y such that locations where no move is possible has its
+                 valued set to less than the minimum.
+        """
         # Find the location of the player's pieces
         piece_locs = torch.sum(x[:, :Rank.moveable_count()], dim=1)
         # Convert piece locations to invalid locations
@@ -912,6 +844,17 @@ class DeepQAgent(Agent, nn.Module):
 
     @staticmethod
     def _get_best_scout_move(state: State, piece: Piece, y: Tensor) -> Tuple[Tensor, Move]:
+        r"""
+        Given the selected scout piece that will move, determine the movement.  The movement Q
+        vector will be used to select the move itself.  For this portion of \p the vector is
+        formatted as: Up in range(1,#Rows-1), Right in range(1,#Cols-1), Down in range(1,#Rows-1),
+        and left Right in range(1,#Cols-1).
+
+        :param state: State of the piece
+        :param piece: Scout that will move
+        :param y: Q vector
+        :return: Tuple of the move's Q value and the selected move
+        """
         r""" Accessor for the best scout move """
         plyr, loc = state.next_player, piece.loc
         num_row_idx, num_col_idx = state.board.num_rows - 1, state.board.num_cols - 1
@@ -938,7 +881,16 @@ class DeepQAgent(Agent, nn.Module):
 
     @staticmethod
     def _get_best_adjacent_move(state: State, piece: Piece, y: torch.Tensor) -> Tuple[Tensor, Move]:
-        r""" Accessor for the best scout move """
+        r"""
+        Given the selected movable piece that is NOT a scout, determine which move direction
+        {Up, Right, Down, Left} (respectively) is the best movement direction.
+
+        :param state: State of the game
+        :param piece: Piece that will move
+        :param y: Q vector
+        :return: Tuple of the value of Q for the selected move and the movement direction
+                 respectively.
+        """
         start = state.board.num_loc
         # Get best move direction node in vector
         y = y[:, start:start+Move.Direction.count()]
