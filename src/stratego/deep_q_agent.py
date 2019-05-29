@@ -402,16 +402,15 @@ class DeepQAgent(Agent, nn.Module):
 
     def train_network(self, s_0: State):
         r""" Train the agent """
-        Move.DISABLE_ASSERT_CHECKS = True
+        # Move.DISABLE_ASSERT_CHECKS = True
 
         s_0.is_training = True
 
         # If a trained model exists, load it. Otherwise, backup the default model
         if DeepQAgent._TRAIN_BEST_MODEL.exists():
             utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
-            bypass_first_head_to_head = False
         else:
-            bypass_first_head_to_head = True
+            utils.save_module(self, DeepQAgent._TRAIN_BEST_MODEL)
 
         self.train()
         self._replay = ReplayMemory()
@@ -429,11 +428,7 @@ class DeepQAgent(Agent, nn.Module):
             self._lr_sched.step()
 
             if self._episode % DeepQAgent._CHECKPOINT_EPISODE_FREQUENCY == 0:
-                if bypass_first_head_to_head:
-                    utils.save_module(self, DeepQAgent._TRAIN_BEST_MODEL)
-                    bypass_first_head_to_head = False
-                else:
-                    self._compare_head_to_head(s_0)
+                self._compare_head_to_head(s_0)
 
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
@@ -470,7 +465,7 @@ class DeepQAgent(Agent, nn.Module):
                 # Print the color of the winning player
                 if t.a.is_game_over():
                     msg, winner = "Flag was attacked", t.a.piece.color.name
-                elif t.s.has_next_any_moves():
+                elif not t.s.has_next_any_moves():
                     next_color = t.s.next_color.name
                     n = t.s.num_next_moveable_pieces()
                     logging.debug("Losing player %s has %d moveable pieces", next_color, n)
@@ -613,6 +608,9 @@ class DeepQAgent(Agent, nn.Module):
         else:
             logging.debug("Head to Head: Restore previous best model")
             utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
+            # Restore epsilon
+            # noinspection PyUnboundLocalVariable
+            self._eps = prev._eps
         self.train()
         logging.debug("COMPLETED: %s", msg)
 

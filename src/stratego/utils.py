@@ -66,7 +66,7 @@ def save_module(module: nn.Module, filepath: Union[Path, str]) -> None:
     r""" Save the specified \p model to disk """
     if isinstance(filepath, str):
         filepath = Path(filepath)
-    filepath.parent.mkdir(exist_ok=True)
+    filepath.parent.mkdir(parents=True, exist_ok=True)
     torch.save(module.state_dict(), str(filepath))
 
 
