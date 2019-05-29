@@ -446,9 +446,6 @@ class DeepQAgent(Agent, nn.Module):
         f_out = open("deep-q_train_moves.txt", "w+")
         f_out.write("# PlayerColor,StartLoc,EndLoc")
 
-        def end_criteria_met(num_moves: int, s: State) -> bool:
-            return num_moves >= self._T or s.is_game_over(allow_move_cycle=True)
-
         tot_num_moves = 0
         num_rand_moves = 0
         logging.info("Starting episode %d of %d", self._episode, self._M)
@@ -456,78 +453,18 @@ class DeepQAgent(Agent, nn.Module):
             # ============================== #
             #          Advance Step          #
             # ============================== #
-            moves_in_round = 0
-            for moves_in_round in range(1, DeepQAgent._MAX_NUM_CONSECUTIVE_MOVES+1):
-                # Prevent effects of cyclic moves and non-Markovian representation causing a false
-                # loss condition
-                if t.s.is_next_moves_unavailable(): t.s.partial_empty_movestack()
-                # If no moves whatsoever, then game over no action defined
-                if t.s.has_next_any_moves(): break
-                # With probability < \epsilon, select a random action
-                if random.random() < self._eps:
-                    t.a = t.s.next_player.get_random_move()
-                    num_rand_moves += 1
-                # Select (epsilon-)greedy action
-                else:
-                    _, t.a = self._get_state_move(t.s, t.base_tensor)
-                f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
-                f_out.flush()
-
-                # Player about to win
-                if t.a.is_game_over(): t.r = self._WIN_REWARD
-                # Game not over yet
-                else: t.r = self._NON_TERMINAL_MOVE_REWARD
-
-                t.compress_movestack()
-                self._replay.add(t)
-                # Advance to next state
-                if t.a.is_game_over(): break
-                t.s.update(t.a)
-                tot_num_moves += 1
+            t, moves_in_round, rand_moves_in_round = self._play_moves(t, f_out)
+            tot_num_moves += moves_in_round
+            num_rand_moves += rand_moves_in_round
 
             # ============================== #
             #          Train Step            #
             # ============================== #
-            for _ in range(moves_in_round):
-                j_arr = self._replay.get_random()
-                # Mini-batch support
-                reward_arr = [j.r for j in j_arr]
-                y_j = torch.cat(reward_arr, dim=0)
-                q_j = torch.zeros_like(y_j, dtype=TensorDType)
-                for idx, j in enumerate(j_arr):
-                    q_j[idx] = self._get_action_output_score(j)
-                    if j.is_terminal(): continue
-
-                    # Only time update to save time
-                    j.create_s_p()
-
-                    if not j.s_p.has_next_any_moves():
-                        y_j[idx] = DeepQAgent._WIN_REWARD
-                    else:
-                        # ToDo Need to fix how board state measured since player changed after move
-                        _, a_p = self._get_state_move(j.s_p, j.base_tensor)
-                        if a_p.is_game_over():
-                            y_j_1_val = DeepQAgent._LOSS_REWARD
-                        else:
-                            j.s_p.update(a_p)
-                            if j.s_p.is_game_over(allow_move_cycle=True):
-                                y_j_1_val = DeepQAgent._LOSS_REWARD
-                            else:
-                                if j.s_p.is_next_moves_unavailable():
-                                    j.s_p.partial_empty_movestack()
-                                with torch.no_grad():
-                                    y_j_1_val, _ = self._get_state_move(j.s_p, j.base_tensor)
-                            j.s_p.rollback()
-
-                        y_j[idx] = y_j[idx] + self._gamma * y_j_1_val
-                        # ToDo may need to rollback multiple moves
-                loss = self._f_loss(y_j, q_j)
-                self._optim.zero_grad()
-                loss.backward()
-                self._optim.step()
+            self._update_network(moves_in_round)
 
             # Advance to next state
-            if end_criteria_met(tot_num_moves, t.s): break
+            if tot_num_moves >= self._T or t.s.is_game_over(allow_move_cycle=True):
+                break
         f_out.close()
 
         # Print the color of the winning player
@@ -547,6 +484,88 @@ class DeepQAgent(Agent, nn.Module):
         f_rand = num_rand_moves / tot_num_moves
         logging.debug("Episode %d: Frac. Moves Random = %.4f", self._episode, f_rand)
         logging.info("COMPLETED episode %d of %d", self._episode, self._M)
+
+    def _play_moves(self, t: ReplayStateTuple, f_out) -> Tuple[ReplayStateTuple, int, int]:
+        r"""
+        Advance the environment and add up to /p _MAX_NUM_CONSECUTIVE_MOVES to the replay buffer.
+
+        :param t: Active state tuple
+        :param f_out: File output stream where moves are being written for logging purposes
+        :return: Tuple of the updated environment state, total number of moves made in this call,
+                 and the number of moves made that were random
+        """
+        moves_in_round = num_rand_moves = 0
+        for moves_in_round in range(1, DeepQAgent._MAX_NUM_CONSECUTIVE_MOVES + 1):
+            # Prevent effects of cyclic moves and non-Markovian representation causing a false
+            # loss condition
+            if t.s.is_next_moves_unavailable(): t.s.partial_empty_movestack()
+            # If no moves whatsoever, then game over no action defined
+            if not t.s.has_next_any_moves(): break
+            # With probability < \epsilon, select a random action
+            if random.random() < self._eps:
+                t.a = t.s.next_player.get_random_move()
+                num_rand_moves += 1
+            # Select (epsilon-)greedy action
+            else:
+                _, t.a = self._get_state_move(t.s, t.base_tensor)
+            f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
+            f_out.flush()
+
+            # Player about to win
+            if t.a.is_game_over(): t.r = self._WIN_REWARD
+            # Game not over yet
+            else: t.r = self._NON_TERMINAL_MOVE_REWARD
+
+            t.compress_movestack()
+            self._replay.add(t)
+            # Advance to next state
+            if t.a.is_game_over(): break
+            t.s.update(t.a)
+        return t, moves_in_round, num_rand_moves
+
+    def _update_network(self, num_batches_to_update: int):
+        r"""
+        Samples from the replay buffer and updates the network \p num_batches_to_update times
+
+        :param num_batches_to_update: Number of batch updates to perform in this function call
+        """
+        for _ in range(num_batches_to_update):
+            j_arr = self._replay.get_random()
+            # Mini-batch support
+            reward_arr = [j.r for j in j_arr]
+            y_j = torch.cat(reward_arr, dim=0)
+            q_j = torch.zeros_like(y_j, dtype=TensorDType)
+            for idx, j in enumerate(j_arr):
+                q_j[idx] = self._get_action_output_score(j)
+                if j.is_terminal(): continue
+
+                # Only time update to save time
+                j.create_s_p()
+
+                if not j.s_p.has_next_any_moves():
+                    y_j[idx] = DeepQAgent._WIN_REWARD
+                else:
+                    # ToDo Need to fix how board state measured since player changed after move
+                    _, a_p = self._get_state_move(j.s_p, j.base_tensor)
+                    if a_p.is_game_over():
+                        y_j_1_val = DeepQAgent._LOSS_REWARD
+                    else:
+                        j.s_p.update(a_p)
+                        if j.s_p.is_game_over(allow_move_cycle=True):
+                            y_j_1_val = DeepQAgent._LOSS_REWARD
+                        else:
+                            if j.s_p.is_next_moves_unavailable():
+                                j.s_p.partial_empty_movestack()
+                            with torch.no_grad():
+                                y_j_1_val, _ = self._get_state_move(j.s_p, j.base_tensor)
+                        j.s_p.rollback()
+
+                    y_j[idx] = y_j[idx] + self._gamma * y_j_1_val
+                    # ToDo may need to rollback multiple moves
+            loss = self._f_loss(y_j, q_j)
+            self._optim.zero_grad()
+            loss.backward()
+            self._optim.step()
 
     def _compare_head_to_head(self, s0: State):
         r""" Test if the current agent is better head to head than previous one """
