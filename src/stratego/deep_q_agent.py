@@ -192,8 +192,7 @@ class ReplayStateTuple:
         self.s_p = copy.deepcopy(self.s)
         self.s_p.update(self.a)
         # Empty move stack if cyclic moves may make it appear as there are no moves
-        if self.s_p.is_next_moves_unavailable():
-            self.s_p.empty_movestack()
+        if self.s_p.is_next_moves_unavailable(): self.s_p.empty_movestack()
 
 
 class ReplayMemory:
@@ -255,15 +254,17 @@ class DeepQAgent(Agent, nn.Module):
     _LR_START = 1E-3
     _f_loss = nn.MSELoss()
     _LOSS_REWARD = -torch.ones((1, 2))  # Must be -1 since output is tanh
-    _INVALID_MOVE_REWARD = _LOSS_REWARD
+    # _INVALID_MOVE_REWARD = _LOSS_REWARD
     _NON_TERMINAL_MOVE_REWARD = torch.full_like(_LOSS_REWARD, -3E-3)
     _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
 
     _MAX_NUM_CONSECUTIVE_MOVES = 10
 
-    TERMINAL_REWARDS = (_LOSS_REWARD, _WIN_REWARD, _INVALID_MOVE_REWARD)
+    # TERMINAL_REWARDS = (_LOSS_REWARD, _WIN_REWARD, _INVALID_MOVE_REWARD)
+    TERMINAL_REWARDS = (_LOSS_REWARD, _WIN_REWARD)
 
-    _INVALID_FILL_VAL = 10 * float(_INVALID_MOVE_REWARD[0, 0])
+    # _INVALID_FILL_VAL = 10 * float(_INVALID_MOVE_REWARD[0, 0])
+    _INVALID_FILL_VAL = 10 * float(_LOSS_REWARD[0, 0])
 
     # _CHECKPOINT_EPISODE_FREQUENCY = 100
     _CHECKPOINT_EPISODE_FREQUENCY = 10
@@ -446,13 +447,7 @@ class DeepQAgent(Agent, nn.Module):
         f_out = open("deep-q_train_moves.txt", "w+")
         f_out.write("# PlayerColor,StartLoc,EndLoc")
 
-
-        def _end_criteria(_t: ReplayStateTuple) -> bool:
-            r""" Check if the game is over """
-            return _t.a.is_game_over() or _t.s.is_game_over(allow_move_cycle=True)
-
-        tot_num_moves = 0
-        num_rand_moves = 0
+        tot_num_moves = num_rand_moves = 0
         logging.info("Starting episode %d of %d", self._episode, self._M)
         while True:
             # ============================== #
@@ -471,23 +466,21 @@ class DeepQAgent(Agent, nn.Module):
             if tot_num_moves >= self._T:
                 logging.debug("Maximum number of moves exceeded")
                 break
-            if _end_criteria(t):
+            if t.a.is_game_over() or t.s.is_game_over(allow_move_cycle=True):
+                # Print the color of the winning player
+                if t.a.is_game_over():
+                    msg, winner = "Flag was attacked", t.a.piece.color.name
+                elif t.s.has_next_any_moves():
+                    next_color = t.s.next_color.name
+                    n = t.s.num_next_moveable_pieces()
+                    logging.debug("Losing player %s has %d moveable pieces", next_color, n)
+                    msg, winner = "Other player had no moves", t.s.get_winner().name
+                else:
+                    msg, winner = "Unknown termination condition", "Unknown"
+                logging.debug("Victory Condition: %s", msg)
+                logging.debug("Episode %d: Winner is %s", self._episode, winner)
                 break
         f_out.close()
-
-        # Print the color of the winning player
-        if _end_criteria(t):
-            if t.a.is_game_over():
-                msg, winner = "Flag was attacked", t.a.piece.color.name
-            elif t.s.has_next_any_moves():
-                next_color = t.s.next_color.name
-                n = t.s.num_next_moveable_pieces()
-                logging.debug("Losing player %s has %d moveable pieces", next_color, n)
-                msg, winner = "Other player had no moves", t.s.get_winner().name
-            else:
-                msg, winner = "Unknown termination condition", "Unknown"
-            logging.debug("Victory Condition: %s", msg)
-            logging.debug("Episode %d: Winner is %s", self._episode, winner)
 
         logging.debug("Episode %d: Number of Total Moves = %d", self._episode, tot_num_moves)
         logging.debug("Episode %d: Number of Random Moves = %d", self._episode, num_rand_moves)
@@ -555,23 +548,20 @@ class DeepQAgent(Agent, nn.Module):
                 if not j.s_p.has_next_any_moves():
                     y_j[idx] = DeepQAgent._WIN_REWARD
                 else:
-                    # ToDo Need to fix how board state measured since player changed after move
                     _, a_p = self._get_state_move(j.s_p, j.base_tensor)
                     if a_p.is_game_over():
-                        y_j_1_val = DeepQAgent._LOSS_REWARD
+                        y_j[idx] = DeepQAgent._LOSS_REWARD
                     else:
                         j.s_p.update(a_p)
                         if j.s_p.is_game_over(allow_move_cycle=True):
-                            y_j_1_val = DeepQAgent._LOSS_REWARD
+                            y_j[idx] = DeepQAgent._LOSS_REWARD
                         else:
                             if j.s_p.is_next_moves_unavailable():
                                 j.s_p.partial_empty_movestack()
                             with torch.no_grad():
                                 y_j_1_val, _ = self._get_state_move(j.s_p, j.base_tensor)
+                            y_j[idx] = y_j[idx] + self._gamma * y_j_1_val
                         j.s_p.rollback()
-
-                    y_j[idx] = y_j[idx] + self._gamma * y_j_1_val
-                    # ToDo may need to rollback multiple moves
             loss = self._f_loss(y_j, q_j)
             self._optim.zero_grad()
             loss.backward()
