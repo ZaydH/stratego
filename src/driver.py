@@ -53,7 +53,7 @@ def _main_deep_q_vs_human():
     game = Game("boards/small.txt", "states/test_debug.txt", visibility=Printer.Visibility.ALL)
     a1 = HumanAgent(game.blue)
     a2 = DeepQAgent(game.board, game.red, game.state)
-    game.two_agent_automated(a1, a2, display=True, moves_output_file="moves.txt")
+    game.two_agent_automated(a1, a2, display=True, move_f_out="moves.txt")
 
 
 def _main_deep_q_vs_rand():
