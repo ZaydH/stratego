@@ -457,32 +457,31 @@ class DeepQAgent(Agent, nn.Module):
             #          Advance Step          #
             # ============================== #
             moves_in_round = 0
-            for moves_in_round in range(DeepQAgent._MAX_NUM_CONSECUTIVE_MOVES):
-                if t.s.is_next_moves_unavailable():
-                    t.s.partial_empty_movestack()
-                # If no moves whatsoever, then game over
-                if t.s.has_next_any_moves():
-                    # With probability < \epsilon, select a random action
-                    if random.random() < self._eps:
-                        t.a = t.s.next_player.get_random_move()
-                        num_rand_moves += 1
-                    # Select (epsilon-)greedy action
-                    else:
-                        _, t.a = self._get_state_move(t.s, t.base_tensor)
-                    f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
-                    f_out.flush()
+            for moves_in_round in range(1, DeepQAgent._MAX_NUM_CONSECUTIVE_MOVES+1):
+                # Prevent effects of cyclic moves and non-Markovian representation causing a false
+                # loss condition
+                if t.s.is_next_moves_unavailable(): t.s.partial_empty_movestack()
+                # If no moves whatsoever, then game over no action defined
+                if t.s.has_next_any_moves(): break
+                # With probability < \epsilon, select a random action
+                if random.random() < self._eps:
+                    t.a = t.s.next_player.get_random_move()
+                    num_rand_moves += 1
+                # Select (epsilon-)greedy action
+                else:
+                    _, t.a = self._get_state_move(t.s, t.base_tensor)
+                f_out.write("\n%s,%s,%s" % (t.a.piece.color.name, str(t.a.orig), str(t.a.new)))
+                f_out.flush()
 
-                # Handle case player already lost
-                if t.s.is_game_over(allow_move_cycle=True): t.r = self._LOSS_REWARD
                 # Player about to win
-                elif t.a.is_game_over(): t.r = self._WIN_REWARD
+                if t.a.is_game_over(): t.r = self._WIN_REWARD
                 # Game not over yet
                 else: t.r = self._NON_TERMINAL_MOVE_REWARD
 
                 t.compress_movestack()
                 self._replay.add(t)
                 # Advance to next state
-                if end_criteria_met(tot_num_moves, t.s): break
+                if t.a.is_game_over(): break
                 t.s.update(t.a)
                 tot_num_moves += 1
 
