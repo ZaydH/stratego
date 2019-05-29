@@ -547,23 +547,25 @@ class DeepQAgent(Agent, nn.Module):
 
                 if not j.s_p.has_next_any_moves():
                     y_j[idx] = DeepQAgent._WIN_REWARD
+                    continue
+                # Get next move
+                _, a_p = self._get_state_move(j.s_p, j.base_tensor)
+                if a_p.is_game_over():
+                    y_j[idx] = DeepQAgent._LOSS_REWARD
+                    continue
+
+                j.s_p.update(a_p)
+                if j.s_p.is_game_over(allow_move_cycle=True):
+                    y_j[idx] = DeepQAgent._LOSS_REWARD
                 else:
-                    _, a_p = self._get_state_move(j.s_p, j.base_tensor)
-                    if a_p.is_game_over():
-                        y_j[idx] = DeepQAgent._LOSS_REWARD
-                    else:
-                        j.s_p.update(a_p)
-                        if j.s_p.is_game_over(allow_move_cycle=True):
-                            y_j[idx] = DeepQAgent._LOSS_REWARD
-                        else:
-                            if j.s_p.is_next_moves_unavailable():
-                                j.s_p.partial_empty_movestack()
-                            with torch.no_grad():
-                                y_j_1_val, _ = self._get_state_move(j.s_p, j.base_tensor)
-                            y_j[idx] = y_j[idx] + self._gamma * y_j_1_val
-                        j.s_p.rollback()
-            loss = self._f_loss(y_j, q_j)
+                    if j.s_p.is_next_moves_unavailable():
+                        j.s_p.partial_empty_movestack()
+                    with torch.no_grad():
+                        y_j_1_val, _ = self._get_state_move(j.s_p, j.base_tensor)
+                    y_j[idx] = y_j[idx] + self._gamma * y_j_1_val
+                j.s_p.rollback()
             self._optim.zero_grad()
+            loss = self._f_loss(y_j, q_j)
             loss.backward()
             self._optim.step()
 
