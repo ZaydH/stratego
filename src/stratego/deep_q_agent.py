@@ -446,6 +446,11 @@ class DeepQAgent(Agent, nn.Module):
         f_out = open("deep-q_train_moves.txt", "w+")
         f_out.write("# PlayerColor,StartLoc,EndLoc")
 
+
+        def _end_criteria(_t: ReplayStateTuple) -> bool:
+            r""" Check if the game is over """
+            return _t.a.is_game_over() or _t.s.is_game_over(allow_move_cycle=True)
+
         tot_num_moves = 0
         num_rand_moves = 0
         logging.info("Starting episode %d of %d", self._episode, self._M)
@@ -466,23 +471,23 @@ class DeepQAgent(Agent, nn.Module):
             if tot_num_moves >= self._T:
                 logging.debug("Maximum number of moves exceeded")
                 break
-            if t.a.is_game_over() or t.s.is_game_over(allow_move_cycle=True):
+            if _end_criteria(t):
                 break
         f_out.close()
 
         # Print the color of the winning player
-        if t.a.is_game_over() or t.s.is_next_moves_unavailable():
+        if _end_criteria(t):
             if t.a.is_game_over():
                 msg, winner = "Flag was attacked", t.a.piece.color.name
-            elif t.s.is_next_moves_unavailable():
+            elif t.s.has_next_any_moves():
                 next_color = t.s.next_color.name
                 n = t.s.num_next_moveable_pieces()
                 logging.debug("Losing player %s has %d moveable pieces", next_color, n)
                 msg, winner = "Other player had no moves", t.s.get_winner().name
             else:
                 msg, winner = "Unknown termination condition", "Unknown"
-            logging.debug("Episode %d: Winner is %s", self._episode, winner)
             logging.debug("Victory Condition: %s", msg)
+            logging.debug("Episode %d: Winner is %s", self._episode, winner)
 
         logging.debug("Episode %d: Number of Total Moves = %d", self._episode, tot_num_moves)
         logging.debug("Episode %d: Number of Random Moves = %d", self._episode, num_rand_moves)
