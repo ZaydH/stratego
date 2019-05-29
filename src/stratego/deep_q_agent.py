@@ -473,7 +473,7 @@ class DeepQAgent(Agent, nn.Module):
         # Print the color of the winning player
         if t.s.is_game_over():
             logging.debug("Episode %d: Winner is %s", self._episode, t.s.get_winner().name)
-            if t.s.was_flag_attacked(): msg = "Flag was attacked"
+            if t.a.is_game_over(): msg = "Flag was attacked"
             elif t.s.is_next_moves_unavailable():
                 next_color = t.s.next_color.name
                 n = t.s.num_next_moveable_pieces()
