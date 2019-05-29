@@ -273,7 +273,7 @@ class DeepQAgent(Agent, nn.Module):
     _NON_TERMINAL_MOVE_REWARD = torch.full_like(_LOSS_REWARD, -3E-3)
     _WIN_REWARD = torch.ones_like(_LOSS_REWARD)
 
-    _MAX_NUM_CONSECUTIVE_MOVES = 10
+    _MAX_NUM_CONSECUTIVE_MOVES = 350
 
     # TERMINAL_REWARDS = (_LOSS_REWARD, _WIN_REWARD, _INVALID_MOVE_REWARD)
     TERMINAL_REWARDS = (_LOSS_REWARD, _WIN_REWARD)
@@ -337,7 +337,7 @@ class DeepQAgent(Agent, nn.Module):
         self._replay = None  # type: Optional[ReplayMemory]
 
         self._episode = 0
-        self._optim = optim.Adam(self.parameters(), lr=DeepQAgent._LR_START)
+        self._optim = optim.Adam(self.parameters(), lr=DeepQAgent._LR_START, weight_decay=1e-4)
         self._lr_sched = optim.lr_scheduler.MultiStepLR(self._optim, milestones=[2000, 5000],
                                                         gamma=0.1)
 
@@ -458,6 +458,7 @@ class DeepQAgent(Agent, nn.Module):
         Move.DISABLE_ASSERT_CHECKS = False
 
     def _make_critic_move(self, t):
+        if not t.s.has_next_any_moves(): return
         if t.s.is_next_moves_unavailable():
             t.s.partial_empty_movestack()
         if random.random() < DeepQAgent._critic._eps:
