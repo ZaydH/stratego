@@ -30,7 +30,7 @@ from stratego.random_agent import RandomAgent
 from . import Location, Move, utils, Game
 from .agent import Agent
 from .board import Board, ToEdgeLists
-from .piece import Piece, Rank
+from .piece import Piece, Rank, Color
 from .player import Player
 from .state import State
 from .utils import EXPORT_DIR, SERIALIZE_DIR, PathOrStr
@@ -298,6 +298,9 @@ class DeepQAgent(Agent, nn.Module):
 
     _EXPORTED_MODEL = EXPORT_DIR / "final_deep_q.pth"
 
+    _critic = None  # type: Optional[DeepQAgent]
+    _CRITIC_PATH = EXPORT_DIR / "_critic_deep_q.pth"
+
     def __init__(self, brd: Board, plyr: Player, state: State, eps_end: float = 1e-4,
                  disable_import: bool = False):
         r"""
@@ -424,6 +427,13 @@ class DeepQAgent(Agent, nn.Module):
             utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
         else:
             utils.save_module(self, DeepQAgent._TRAIN_BEST_MODEL)
+        # Create the critical
+        DeepQAgent._critic = DeepQAgent(self._brd, self._plyr, self._state, disable_import=True)
+        if DeepQAgent._CRITIC_PATH.exists():
+            utils.load_module(self, DeepQAgent._CRITIC_PATH)
+        else:
+            utils.save_module(self, DeepQAgent._CRITIC_PATH)
+        DeepQAgent._critic.eval()
 
         self.train()
         self._replay = ReplayMemory()
@@ -447,6 +457,15 @@ class DeepQAgent(Agent, nn.Module):
         utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
 
+    def _make_critic_move(self, t):
+        if t.s.is_next_moves_unavailable():
+            t.s.partial_empty_movestack()
+        if random.random() < DeepQAgent._critic._eps:
+            a = t.s.next_player.get_random_move()
+        else:
+            _, a = DeepQAgent._critic._get_state_move(t.s, t.base_tensor)
+        t.s.update(a)
+
     def _train_episode(self, t: ReplayStateTuple) -> None:
         r"""
         Performs training for a single epoch
@@ -456,13 +475,15 @@ class DeepQAgent(Agent, nn.Module):
         f_out = open("deep-q_train_moves.txt", "w+")
         f_out.write("# PlayerColor,StartLoc,EndLoc")
 
+        critic_color = Color.RED if random.random() < 0.5 else Color.BLUE
+
         tot_num_moves = num_rand_moves = 0
         logging.info("Starting episode %d of %d", self._episode, self._M)
         while True:
             # ============================== #
             #          Advance Step          #
             # ============================== #
-            t, moves_in_round, rand_moves_in_round = self._play_moves(t, f_out)
+            t, moves_in_round, rand_moves_in_round = self._play_moves(t, f_out, critic_color)
             tot_num_moves += moves_in_round
             num_rand_moves += rand_moves_in_round
 
@@ -475,17 +496,18 @@ class DeepQAgent(Agent, nn.Module):
             if tot_num_moves >= self._T:
                 logging.debug("Maximum number of moves exceeded")
                 break
-            if t.a.is_game_over() or t.s.is_game_over(allow_move_cycle=True):
+            if t.s.is_game_over(allow_move_cycle=True):
                 # Print the color of the winning player
-                if t.a.is_game_over():
-                    msg, winner = "Flag was attacked", t.a.piece.color.name
+                if t.s.was_flag_attacked():
+                    msg = "Flag was attacked"
                 elif not t.s.has_next_any_moves():
                     next_color = t.s.next_color.name
                     n = t.s.num_next_moveable_pieces()
                     logging.debug("Losing player %s has %d moveable pieces", next_color, n)
-                    msg, winner = "Other player had no moves", t.s.get_winner().name
+                    msg = "Other player had no moves"
                 else:
-                    msg, winner = "Unknown termination condition", "Unknown"
+                    msg = "Unknown termination condition"
+                winner = t.s.get_winner().name
                 logging.debug("Episode %d: Winner is %s", self._episode, winner)
                 logging.debug("Victory Condition: %s", msg)
                 break
@@ -534,7 +556,7 @@ class DeepQAgent(Agent, nn.Module):
         with open(export_path, "wb") as pk_out:
             pickle.dump(self._replay, pk_out)
 
-    def _play_moves(self, t: ReplayStateTuple, f_out) -> Tuple[ReplayStateTuple, int, int]:
+    def _play_moves(self, t: ReplayStateTuple, f_out, critic_color) -> Tuple[ReplayStateTuple, int, int]:
         r"""
         Advance the environment and add up to /p _MAX_NUM_CONSECUTIVE_MOVES to the replay buffer.
 
@@ -545,6 +567,9 @@ class DeepQAgent(Agent, nn.Module):
         """
         moves_in_round = num_rand_moves = 0
         for moves_in_round in range(1, DeepQAgent._MAX_NUM_CONSECUTIVE_MOVES + 1):
+            if t.s.next_color == critic_color:
+                self._make_critic_move(t)
+                if t.s.is_game_over(allow_move_cycle=True): break
             # Prevent effects of cyclic moves and non-Markovian representation causing a false
             # loss condition
             if t.s.is_next_moves_unavailable(): t.s.partial_empty_movestack()
@@ -597,7 +622,8 @@ class DeepQAgent(Agent, nn.Module):
                     y_j[idx] = j.r = DeepQAgent._WIN_REWARD
                     continue
                 # Get next move
-                _, a_p = self._get_state_move(j.s_p, j.base_tensor)
+                # _, a_p = self._get_state_move(j.s_p, j.base_tensor)
+                _, a_p = DeepQAgent._critic._get_state_move(j.s_p, j.base_tensor)
                 # If other play won, overwrite as true reward not originally visible
                 # No need to make move guaranteed to end the game so just skip update/rollback
                 if a_p.is_game_over():
@@ -621,37 +647,33 @@ class DeepQAgent(Agent, nn.Module):
 
     def _compare_head_to_head(self, s0: State):
         r""" Test if the current agent is better head to head than previous one """
-        temp_back_up = EXPORT_DIR / "_temp_train_backup.pth"
-        utils.save_module(self, temp_back_up)
-
         msg = "Head to head agent competition for episode %d" % self._episode
         logging.debug("Starting: %s", msg)
 
-        backup_epsilon = self._eps
         max_move = num_wins = 0
-        cur_flag_att = prev_flag_att = 0
+        cur_flag_att = crit_flag_att = 0
         for _ in range(DeepQAgent._NUM_HEAD_TO_HEAD_GAMES):
             game = Game(self._brd, copy.deepcopy(s0), None)
             if random.random() < 0.5:
-                cur_col, prev_col = game.red, game.blue
+                cur_col, critic_col = game.red, game.blue
             else:
-                cur_col, prev_col = game.blue, game.red
+                cur_col, critic_col = game.blue, game.red
 
             cur = DeepQAgent(game.board, cur_col, game.state, disable_import=True)
-            utils.load_module(cur, temp_back_up)
+            utils.load_module(cur, DeepQAgent._TRAIN_BEST_MODEL)
             cur._make_rand_move_prob = cur._eps
 
-            prev = DeepQAgent(game.board, prev_col, game.state, disable_import=True)
-            utils.load_module(prev, DeepQAgent._TRAIN_BEST_MODEL)
-            prev._make_rand_move_prob = cur._eps  # Use same randomness so fair comparison
+            critic = DeepQAgent(game.board, critic_col, game.state, disable_import=True)
+            utils.load_module(critic, DeepQAgent._CRITIC_PATH)
+            critic._make_rand_move_prob = cur._eps  # Use same randomness so fair comparison
 
-            winner, flag_attacked = game.two_agent_automated(cur, prev, wait_time=0,
+            winner, flag_attacked = game.two_agent_automated(cur, critic, wait_time=0,
                                                              max_num_moves=4000, display=False)
             if winner == cur.color:
                 num_wins += 1
                 if flag_attacked: cur_flag_att += 1
             elif flag_attacked:
-                prev_flag_att += 1
+                crit_flag_att += 1
             elif winner is None:
                 max_move += 1
 
@@ -663,19 +685,20 @@ class DeepQAgent(Agent, nn.Module):
         logging.debug("Episode %d: Head to head win frequency %.3f", self._episode, win_freq)
         f_max = max_move / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES
         logging.debug("Episode %d: Halted due to max moves frequency %.3f", self._episode, f_max)
-        tot_flag_att = cur_flag_att + prev_flag_att
+        tot_flag_att = cur_flag_att + crit_flag_att
         logging.debug("Episode %d: Total flag attacks: %d", self._episode, tot_flag_att)
         logging.debug("Episode %d: Current Deep-Q flag attacks: %d", self._episode, cur_flag_att)
-        logging.debug("Episode %d: Previous Deep-Q flag attacks: %d", self._episode, prev_flag_att)
+        logging.debug("Episode %d: Critic Deep-Q flag attacks: %d", self._episode, crit_flag_att)
 
         if 0.5 <= win_freq:
-            logging.debug("Head to Head: Backing up new best model")
+            logging.debug("Head to Head: Switch to critic")
             utils.save_module(self, DeepQAgent._TRAIN_BEST_MODEL)
-        else:
-            logging.debug("Head to Head: Restore previous best model")
-            utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
-            self._eps = backup_epsilon
+            utils.save_module(DeepQAgent._critic, DeepQAgent._CRITIC_PATH)
+
+            utils.load_module(self, DeepQAgent._CRITIC_PATH)
+            utils.load_module(DeepQAgent._critic, DeepQAgent._TRAIN_BEST_MODEL)
         self.train()
+        DeepQAgent._critic.eval()
         logging.debug("COMPLETED: %s", msg)
 
     # def _punish_invalid_move(self, state_tuple: ReplayStateTuple) -> None:
