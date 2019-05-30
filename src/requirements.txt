@@ -1,8 +1,7 @@
-dataclasses==0.6
-numpy==1.16.1
 pytest==4.4.0
 setuptools==39.0.1
+torch==1.1.0
 sty==1.0.0b9
-tqdm==4.30.0
-torch==1.0.1.post2
+numpy==1.16.1
 typing==3.6.6
+dataclasses==0.6
