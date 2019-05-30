@@ -16,7 +16,7 @@ import operator as op
 import pickle
 import random
 from pathlib import Path
-from typing import Tuple, Iterable, Union, List, Optional
+from typing import Tuple, Iterable, Union, List, Optional, Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -313,15 +313,11 @@ class DeepQAgent(Agent, nn.Module):
         self._state = state
         # self._other = other
         self._brd = brd
-        # Layer 0 to d-1: 1 if piece of i^th rank is present, otherwise 0
-        # Layer d: 1 for any piece of unknown rank (not used)
-        # Layer d+1: 1 for an impassable location, 0 otherwise
-        # Layer d+2: 1 for which player's turn is next, 0 otherwise
-        self._d_in = 2 * Rank.count() + 2
 
         self._eps = self._EPS_START
         self._EPS_END = eps_end
 
+        self._d_in = self._get_initial_in_dim()
         self._set_initial_out_dim()
 
         # Tensor used as the basis for move tensors
@@ -334,11 +330,11 @@ class DeepQAgent(Agent, nn.Module):
         self._replay = None  # type: Optional[ReplayMemory]
 
         self._episode = 0
-        self._optim = optim.Adam(self.parameters(), lr=DeepQAgent._LR_START)
+        self._optim = optim.Adam(self.parameters(), lr=self._LR_START)
         self._lr_sched = optim.lr_scheduler.MultiStepLR(self._optim, milestones=[2000, 5000],
                                                         gamma=0.1)
 
-        for model_path in [DeepQAgent._EXPORTED_MODEL, DeepQAgent._TRAIN_BEST_MODEL]:
+        for model_path in [self._EXPORTED_MODEL, self._TRAIN_BEST_MODEL]:
             if model_path.exists(): break
         if not disable_import and model_path.exists():
             # msg = "Importing saved model: \"%s\"" % str(model_path)
@@ -401,6 +397,15 @@ class DeepQAgent(Agent, nn.Module):
         r""" Accessor for the maximum size of the policy set """
         return self._d_out
 
+    @staticmethod
+    def _get_initial_in_dim() -> int:
+        r""" Configure initial input dimension """
+        # Layer 0 to d-1: 1 if piece of i^th rank is present, otherwise 0 (2x one for each player)
+        # Layer d: 1 for any piece of unknown rank (not used)
+        # Layer d+1: 1 for an impassable location, 0 otherwise
+        # Layer d+2: 1 for which player's turn is next, 0 otherwise
+        return 2 * Rank.count() + 2
+
     def _set_initial_out_dim(self) -> None:
         r"""
         New network architecture has three parts.  Piece location, movement direction, and scout
@@ -420,10 +425,10 @@ class DeepQAgent(Agent, nn.Module):
         s_0.is_training = True
 
         # If a trained model exists, load it. Otherwise, backup the default model
-        if DeepQAgent._TRAIN_BEST_MODEL.exists():
-            utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
+        if self._TRAIN_BEST_MODEL.exists():
+            utils.load_module(self, self._TRAIN_BEST_MODEL)
         else:
-            utils.save_module(self, DeepQAgent._TRAIN_BEST_MODEL)
+            utils.save_module(self, self._TRAIN_BEST_MODEL)
 
         self.train()
         self._replay = ReplayMemory()
@@ -441,10 +446,10 @@ class DeepQAgent(Agent, nn.Module):
             # noinspection PyArgumentList
             self._lr_sched.step()
 
-            if self._episode % DeepQAgent._CHECKPOINT_EPISODE_FREQUENCY == 0:
+            if self._episode % self._CHECKPOINT_EPISODE_FREQUENCY == 0:
                 self._compare_head_to_head(s_0)
 
-        utils.save_module(self, DeepQAgent._EXPORTED_MODEL)
+        utils.save_module(self, self._EXPORTED_MODEL)
         Move.DISABLE_ASSERT_CHECKS = False
 
     def _train_episode(self, t: ReplayStateTuple) -> None:
@@ -544,7 +549,7 @@ class DeepQAgent(Agent, nn.Module):
                  and the number of moves made that were random
         """
         moves_in_round = num_rand_moves = 0
-        for moves_in_round in range(1, DeepQAgent._MAX_NUM_CONSECUTIVE_MOVES + 1):
+        for moves_in_round in range(1, self._MAX_NUM_CONSECUTIVE_MOVES + 1):
             # Prevent effects of cyclic moves and non-Markovian representation causing a false
             # loss condition
             if t.s.is_next_moves_unavailable(): t.s.partial_empty_movestack()
@@ -594,19 +599,19 @@ class DeepQAgent(Agent, nn.Module):
                 j.create_s_p()
                 # If opponent has no moves, overwrite reward as true reward not visible until update
                 if not j.s_p.has_next_any_moves():
-                    y_j[idx] = j.r = DeepQAgent._WIN_REWARD
+                    y_j[idx] = j.r = self._WIN_REWARD
                     continue
                 # Get next move
                 _, a_p = self._get_state_move(j.s_p, j.base_tensor)
                 # If other play won, overwrite as true reward not originally visible
                 # No need to make move guaranteed to end the game so just skip update/rollback
                 if a_p.is_game_over():
-                    y_j[idx] = j.r = DeepQAgent._LOSS_REWARD
+                    y_j[idx] = j.r = self._LOSS_REWARD
                     continue
 
                 j.s_p.update(a_p)
                 if j.s_p.is_game_over(allow_move_cycle=True):
-                    y_j[idx] = j.r = DeepQAgent._LOSS_REWARD
+                    y_j[idx] = j.r = self._LOSS_REWARD
                 else:
                     if j.s_p.is_next_moves_unavailable():
                         j.s_p.partial_empty_movestack()
@@ -630,19 +635,19 @@ class DeepQAgent(Agent, nn.Module):
         backup_epsilon = self._eps
         max_move = num_wins = 0
         cur_flag_att = prev_flag_att = 0
-        for _ in range(DeepQAgent._NUM_HEAD_TO_HEAD_GAMES):
+        for _ in range(self._NUM_HEAD_TO_HEAD_GAMES):
             game = Game(self._brd, copy.deepcopy(s0), None)
             if random.random() < 0.5:
                 cur_col, prev_col = game.red, game.blue
             else:
                 cur_col, prev_col = game.blue, game.red
 
-            cur = DeepQAgent(game.board, cur_col, game.state, disable_import=True)
+            cur = type(self)(game.board, cur_col, game.state, disable_import=True)
             utils.load_module(cur, temp_back_up)
             cur._make_rand_move_prob = cur._eps
 
-            prev = DeepQAgent(game.board, prev_col, game.state, disable_import=True)
-            utils.load_module(prev, DeepQAgent._TRAIN_BEST_MODEL)
+            prev = type(self)(game.board, prev_col, game.state, disable_import=True)
+            utils.load_module(prev, self._TRAIN_BEST_MODEL)
             prev._make_rand_move_prob = cur._eps  # Use same randomness so fair comparison
 
             winner, flag_attacked = game.two_agent_automated(cur, prev, wait_time=0,
@@ -656,12 +661,12 @@ class DeepQAgent(Agent, nn.Module):
                 max_move += 1
 
         max_timeouts_to_consider = 5
-        denom = DeepQAgent._NUM_HEAD_TO_HEAD_GAMES - min(max_timeouts_to_consider, max_move)
+        denom = self._NUM_HEAD_TO_HEAD_GAMES - min(max_timeouts_to_consider, max_move)
         win_freq = num_wins / denom
-        n = DeepQAgent._NUM_HEAD_TO_HEAD_GAMES
+        n = self._NUM_HEAD_TO_HEAD_GAMES
         logging.debug("Episode %d: Total Number Games %d", self._episode, n)
         logging.debug("Episode %d: Head to head win frequency %.3f", self._episode, win_freq)
-        f_max = max_move / DeepQAgent._NUM_HEAD_TO_HEAD_GAMES
+        f_max = max_move / self._NUM_HEAD_TO_HEAD_GAMES
         logging.debug("Episode %d: Halted due to max moves frequency %.3f", self._episode, f_max)
         tot_flag_att = cur_flag_att + prev_flag_att
         logging.debug("Episode %d: Total flag attacks: %d", self._episode, tot_flag_att)
@@ -670,10 +675,10 @@ class DeepQAgent(Agent, nn.Module):
 
         if 0.5 <= win_freq:
             logging.debug("Head to Head: Backing up new best model")
-            utils.save_module(self, DeepQAgent._TRAIN_BEST_MODEL)
+            utils.save_module(self, self._TRAIN_BEST_MODEL)
         else:
             logging.debug("Head to Head: Restore previous best model")
-            utils.load_module(self, DeepQAgent._TRAIN_BEST_MODEL)
+            utils.load_module(self, self._TRAIN_BEST_MODEL)
             self._eps = backup_epsilon
         self.train()
         logging.debug("COMPLETED: %s", msg)
@@ -706,7 +711,7 @@ class DeepQAgent(Agent, nn.Module):
         :return: Tuple of the output node, entire policy tensor, maximum valued error, and the
                  selected move respectively
         """
-        x = DeepQAgent._build_input_tensor(base_tensor, s.pieces(), s.next_player)
+        x = self._build_input_tensor(base_tensor, s.pieces(), s.next_player)
         return self._get_next_move(s, x)
 
     # def _build_invalid_move_set(self, state_tuple: ReplayStateTuple) -> List[int]:
@@ -822,7 +827,7 @@ class DeepQAgent(Agent, nn.Module):
         if self._make_rand_move_prob is not None and random.random() < self._make_rand_move_prob:
             return self._plyr.get_random_move()
 
-        x = DeepQAgent._build_input_tensor(self._base_in, self._state.pieces(),
+        x = self._build_input_tensor(self._base_in, self._state.pieces(),
                                            self._state.next_player)
         _, move = self._get_next_move(self._state, x)
         return move
@@ -831,7 +836,7 @@ class DeepQAgent(Agent, nn.Module):
         y_out = self.forward(x)
 
         # policy = self._null_blocked_moves(state_tuple, , clone=True)
-        y = DeepQAgent._null_invalid_locations(state, x, y_out.clone())
+        y = self._null_invalid_locations(state, x, y_out.clone())
         board_loc = int(y[:, :state.board.num_loc].argmax(dim=1))
 
         ret_tensor = torch.empty((x.shape[0], 2), dtype=TensorDType)
@@ -845,8 +850,8 @@ class DeepQAgent(Agent, nn.Module):
             ret_tensor[:, 1], m = self._get_best_scout_move(state, piece, y)
         else:
             # Handle non-scout piece movements
-            y = DeepQAgent._null_invalid_directions(state, piece, y)
-            ret_tensor[:, 1], m = DeepQAgent._get_best_adjacent_move(state, piece, y)
+            y = self._null_invalid_directions(state, piece, y)
+            ret_tensor[:, 1], m = self._get_best_adjacent_move(state, piece, y)
         return ret_tensor, m
 
     @staticmethod
@@ -898,7 +903,7 @@ class DeepQAgent(Agent, nn.Module):
     def _null_scout_moves(self, state: State, p: Piece, y: Tensor) -> Tensor:
         r""" Null out moves that are invalid for the scout """
         assert p.rank == Rank.scout()
-        null_vec = torch.full((self._tot_num_scout_moves,), fill_value=DeepQAgent._INVALID_FILL_VAL,
+        null_vec = torch.full((self._tot_num_scout_moves,), fill_value=self._INVALID_FILL_VAL,
                               dtype=TensorDType)
 
         offset = 0
@@ -1049,21 +1054,23 @@ class DeepQAgent(Agent, nn.Module):
             if p.color != next_player.color:
                 layer_num += Rank.count()
             x[0, layer_num, p.loc.r, p.loc.c] = DeepQAgent._PIECE_VAL
-            # if p.color == Color.RED: color_val = DeepQAgent._RED_PIECE_VAL
-            # else: color_val = DeepQAgent._BLUE_PIECE_VAL
+            # if p.color == Color.RED: color_val = self._RED_PIECE_VAL
+            # else: color_val = self._BLUE_PIECE_VAL
             #
             # # Mark piece as present
-            # x[0, DeepQAgent._rank_lookup[p.rank], p.loc.r, p.loc.c] = color_val
+            # x[0, self._rank_lookup[p.rank], p.loc.r, p.loc.c] = color_val
             # if p.color == next_player.color:
-            #     x[0, DeepQAgent._next_turn_layer, p.loc.r, p.loc.c] = color_val
+            #     x[0, self._next_turn_layer, p.loc.r, p.loc.c] = color_val
             # ToDo Need to update when imperfect information
         return x
 
 
-def compare_deep_q_versus_random(brd_file: PathOrStr, state_file: PathOrStr, num_head_to_head: int):
+def compare_q_versus_random(q_class: Callable, brd_file: PathOrStr, state_file: PathOrStr,
+                            num_head_to_head: int):
     r"""
     Compares the Deep-Q agent to a random learner
 
+    :param q_class: Class of the Q-learner
     :param brd_file: Path to the board file
     :param state_file: Path to the state file
     :param num_head_to_head: Number of head to head games
@@ -1086,7 +1093,7 @@ def compare_deep_q_versus_random(brd_file: PathOrStr, state_file: PathOrStr, num
         else:
             deep_q_col, rand_col = game.blue, game.red
 
-        deep_q_agent = DeepQAgent(game.board, deep_q_col, game.state)
+        deep_q_agent = q_class(game.board, deep_q_col, game.state)
         deep_q_agent._make_rand_move_prob = 0
         rand_agent = RandomAgent(rand_col)
 

@@ -132,5 +132,9 @@ class Location:
         r""" Example displaying how the board file blocked location should appear. """
         return "(ROW,COLUMN)"
 
+    def __sub__(self, other):
+        r""" Manhattan distance between two locations """
+        return abs(self.r - other.r) + abs(self.c - other.c)
+
     def __str__(self):
         return "(%d,%d)" % (self.r, self.c)
