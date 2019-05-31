@@ -1,47 +1,32 @@
-import sys
+import argparse
 
 from stratego import Game
-from stratego.deep_q_agent import DeepQAgent, compare_deep_q_versus_random
+from stratego.deep_q_agent import DeepQAgent, compare_deep_q_head_to_head, \
+    compare_deep_q_versus_random
 # noinspection PyUnresolvedReferences
 from stratego.human_agent import HumanAgent
 from stratego.printer import Printer
 # noinspection PyUnresolvedReferences
 from stratego.random_agent import RandomAgent
-from stratego.utils import setup_logger, PathOrStr
+from stratego.utils import setup_logger, EXPORT_DIR
+
 
 # ToDo Add argparse
-
-
-# noinspection PyProtectedMember
-def _main_hard_coded():
-
-    from stratego.location import Location
-    from stratego.move import Move
-    from stratego.player import Player
-
-    def _get_move(plyr: Player, l1, l2) -> Move:
-        available_moves = plyr.move_set.avail
-        values = list(available_moves.values())
-        v = [v for v in values if v.orig == Location(*l1) and v.new == Location(*l2)]
-        assert v
-        return v[0]
-
-    game = Game("boards/small.txt", "states/small_debug.txt", visibility=Printer.Visibility.ALL)
-    m = _get_move(game._state.red, (0, 3), (1, 3))
-    game.play_move(m, True)
-    m = _get_move(game._state.blue, (7, 3), (1, 3))
-    game.play_move(m, True)
-
-    game = Game("boards/small.txt", "states/small_debug.txt", visibility=Printer.Visibility.ALL)
-    game.display_current()
-    m = _get_move(game._state.red, (0, 3), (7, 3))
-    game.play_move(m, True)
-
-    game = Game("boards/small.txt", "states/small_debug.txt", visibility=Printer.Visibility.ALL)
-    game.display_current()
+def parse_args():
+    r""" Parse the command line input arguments """
+    args = argparse.ArgumentParser()
+    args.add_argument("-human", help="Play against a deep Q agent", default=False,
+                      action='store_true')
+    args.add_argument("-train", help="Perform training", default=False, action='store_true')
+    args.add_argument("-random", help="Play two random agents", default=False, action='store_true')
+    args.add_argument("-base", help="Play two random agents", default=False, action='store_true')
+    args.add_argument("-compare", help="", default=False,
+                      action='store_true')
+    return args.parse_args()
 
 
 def _main_random():
+    r""" Player two random agents """
     game = Game("boards/small.txt", "states/test_debug.txt", visibility=Printer.Visibility.ALL)
     a1, a2 = RandomAgent(game.red), RandomAgent(game.blue)
     # a2 = RandomAgent(game.blue)
@@ -57,14 +42,15 @@ def _main_deep_q_vs_human():
 
 
 def _main_deep_q_vs_rand():
-    compare_deep_q_versus_random("boards/small.txt", "states/test_debug.txt", 101)
+    for i in range(2, 6):
+        file = EXPORT_DIR / ("_checkpoint_lr=1e-%d_wd=0.pth" % i)
+        compare_deep_q_versus_random("boards/small.txt", "states/test_debug.txt", 101, file)
 
 
-def _main_make_moves(moves_file: PathOrStr, display_after_move: bool = False):
-    game = Game("boards/small.txt", "states/test_debug.txt", visibility=Printer.Visibility.ALL)
-    # noinspection PyProtectedMember
-    game._execute_move_file(moves_file, display_after_move)
-    game.display_current()
+def _compare_two_deep_q():
+    compare_deep_q_head_to_head("boards/small.txt", "states/test_debug.txt", 1001,
+                                EXPORT_DIR / "_checkpoint_lr=1e-5_wd=0_epoch=260_no_checkpoint.pth",
+                                EXPORT_DIR / "_checkpoint_lr=1e-5_wd=0_no_checkpoint.pth")
 
 
 def _main_train():
@@ -74,14 +60,18 @@ def _main_train():
 
 
 def _main():
-    # _main_hard_coded()
-    # _main_random()
-    # _main_make_moves("moves.txt")
-    # _main_deep_q_vs_rand()
-    if len(sys.argv) > 1:
+    args = parse_args()
+
+    if args.human:
         _main_deep_q_vs_human()
-    else:
+    elif args.train:
         _main_train()
+    elif args.random:
+        _main_random()
+    elif args.base:
+        _main_deep_q_vs_rand()
+    elif args.compare:
+        _compare_two_deep_q()
 
 
 if __name__ == "__main__":

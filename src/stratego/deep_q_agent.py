@@ -1060,7 +1060,8 @@ class DeepQAgent(Agent, nn.Module):
         return x
 
 
-def compare_deep_q_versus_random(brd_file: PathOrStr, state_file: PathOrStr, num_head_to_head: int):
+def compare_deep_q_versus_random(brd_file: PathOrStr, state_file: PathOrStr, num_head_to_head: int,
+                                 module_file: Path):
     r"""
     Compares the Deep-Q agent to a random learner
 
@@ -1087,6 +1088,7 @@ def compare_deep_q_versus_random(brd_file: PathOrStr, state_file: PathOrStr, num
             deep_q_col, rand_col = game.blue, game.red
 
         deep_q_agent = DeepQAgent(game.board, deep_q_col, game.state)
+        utils.load_module(deep_q_agent, module_file)
         deep_q_agent._make_rand_move_prob = 0
         rand_agent = RandomAgent(rand_col)
 
@@ -1107,3 +1109,61 @@ def compare_deep_q_versus_random(brd_file: PathOrStr, state_file: PathOrStr, num
     logging.debug("Total flag attacks: %d", rand_flag_attack + deep_q_flag_attack)
     logging.debug("Deep-Q flag attacks: %d", deep_q_flag_attack)
     logging.debug("Random flag attacks: %d", rand_flag_attack)
+
+
+def compare_deep_q_head_to_head(brd_file: PathOrStr, state_file: PathOrStr, num_head_to_head: int,
+                                agent1_state_file: PathOrStr, agent2_state_file: PathOrStr):
+    r"""
+    Compares two Deep-Q learners head to head
+
+    :param brd_file: Path to the board file
+    :param state_file: Path to the state file
+    :param num_head_to_head: Number of head to head games
+    """
+    if not isinstance(brd_file, Path): brd_file = Path(brd_file)
+    if not isinstance(state_file, Path): state_file = Path(state_file)
+    if not isinstance(agent1_state_file, Path): agent1_state_file = Path(agent1_state_file)
+    if not isinstance(agent2_state_file, Path): agent2_state_file = Path(agent2_state_file)
+
+    msg = "Head to head agent competition of two Deep-Q agents"
+    logging.debug("Starting: %s", msg)
+
+    brd = Board.importer(brd_file)
+    s0 = State.importer(state_file, brd)
+
+    max_move = num_wins = 0
+    agent1_flag_attack = agent2_flag_attack = 0
+    for i in range(1, num_head_to_head + 1):
+        game = Game(brd, copy.deepcopy(s0), None)
+        if random.random() < 0.5:
+            a1_col, a2_col = game.red, game.blue
+        else:
+            a1_col, a2_col = game.blue, game.red
+
+        agent1 = DeepQAgent(game.board, a1_col, game.state, disable_import=True)
+        utils.load_module(agent1, agent1_state_file)
+
+        agent2 = DeepQAgent(game.board, a2_col, game.state, disable_import=True)
+        utils.load_module(agent2, agent2_state_file)
+        agent1._make_rand_move_prob = agent2._make_rand_move_prob = 0.3
+
+        winner, flag_attacked = game.two_agent_automated(agent1, agent2, wait_time=0,
+                                                         max_num_moves=4000, display=False)
+        if winner == agent1.color:
+            num_wins += 1
+            if flag_attacked: agent1_flag_attack += 1
+        elif flag_attacked:
+            agent2_flag_attack += 1
+        elif winner is None:
+            max_move += 1
+        win_freq = num_wins / i
+        if i % 20 == 0:
+            logging.debug("Games %d/%d: Agent 1 Win Frequency: %.3f", i, num_head_to_head, win_freq)
+
+    win_freq = num_wins / num_head_to_head
+    logging.debug("Total Number of Games: %d", num_head_to_head)
+    logging.debug("Head to head win frequency %.3f", win_freq)
+    logging.debug("Halted due to max moves frequency %.3f", max_move / num_head_to_head)
+    logging.debug("Total flag attacks: %d", agent2_flag_attack + agent1_flag_attack)
+    logging.debug("Agent1 flag attacks: %d", agent1_flag_attack)
+    logging.debug("Agent2 flag attacks: %d", agent2_flag_attack)
