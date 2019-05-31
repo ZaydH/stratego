@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 
 from stratego import Game
 from stratego.deep_q_agent import DeepQAgent, compare_deep_q_head_to_head, \
@@ -41,10 +42,19 @@ def _main_deep_q_vs_human():
     game.two_agent_automated(a1, a2, display=True, move_f_out="moves.txt")
 
 
-def _main_deep_q_vs_rand():
-    for i in range(2, 6):
-        file = EXPORT_DIR / ("_checkpoint_lr=1e-%d_wd=0.pth" % i)
-        compare_deep_q_versus_random("boards/small.txt", "states/test_debug.txt", 101, file)
+def _main_deep_q_vs_rand(num_games: int = 501):
+    def _default_name(i: int) -> Path:
+        return EXPORT_DIR / ("_checkpoint_lr=1e-%d_wd=0.pth" % i)
+
+    # Test against a random agent
+    all_paths = [EXPORT_DIR / "_checkpoint_initial.pth"] + [_default_name(i) for i in range(2, 6)]
+    for file in all_paths:
+        compare_deep_q_versus_random("boards/small.txt", "states/test_debug.txt", num_games, file)
+
+    # Test against a Deep-Q agent with random weights.
+    for file in all_paths[1:]:
+        compare_deep_q_head_to_head("boards/small.txt", "states/test_debug.txt", num_games, file,
+                                    EXPORT_DIR / "_checkpoint_initial.pth" )
 
 
 def _compare_two_deep_q():
