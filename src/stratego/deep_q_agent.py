@@ -427,7 +427,7 @@ class DeepQAgent(Agent, nn.Module):
 
         self.train()
         self._replay = ReplayMemory()
-        self._fill_initial_move_buffer(copy.deepcopy(s_0))
+        # self._fill_initial_move_buffer(copy.deepcopy(s_0))
 
         num_rem_episodes = self._M - self._episode
         eps_range = np.linspace(self._eps, self._EPS_END, num=num_rem_episodes, endpoint=True)
@@ -1068,12 +1068,14 @@ def compare_deep_q_versus_random(brd_file: PathOrStr, state_file: PathOrStr, num
     :param brd_file: Path to the board file
     :param state_file: Path to the state file
     :param num_head_to_head: Number of head to head games
+    :param module_file: Path to the state dictionary
     """
     if not isinstance(brd_file, Path): brd_file = Path(brd_file)
     if not isinstance(state_file, Path): state_file = Path(state_file)
 
     msg = "Head to head agent competition of Deep-Q versus Random"
     logging.debug("Starting: %s", msg)
+    logging.info("Learner State Dictionary File: %s", str(module_file))
 
     brd = Board.importer(brd_file)
     s0 = State.importer(state_file, brd)
