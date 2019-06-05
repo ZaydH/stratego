@@ -20,9 +20,9 @@ def parse_args():
                       action='store_true')
     args.add_argument("-train", help="Perform training", default=False, action='store_true')
     args.add_argument("-random", help="Play two random agents", default=False, action='store_true')
-    args.add_argument("-base", help="Play two random agents", default=False, action='store_true')
-    args.add_argument("-compare", help="", default=False,
-                      action='store_true')
+    args.add_argument("-base", help="Play a random agent against the Deep Q network",
+                      default=False, action='store_true')
+    # args.add_argument("-compare", help="", default=False, action='store_true')
     return args.parse_args()
 
 
@@ -57,10 +57,10 @@ def _main_deep_q_vs_rand(num_games: int = 501):
                                     EXPORT_DIR / "_checkpoint_initial.pth" )
 
 
-def _compare_two_deep_q():
-    compare_deep_q_head_to_head("boards/small.txt", "states/test_debug.txt", 1001,
-                                EXPORT_DIR / "_checkpoint_lr=1e-5_wd=0_epoch=260_no_checkpoint.pth",
-                                EXPORT_DIR / "_checkpoint_lr=1e-5_wd=0_no_checkpoint.pth")
+# def _compare_two_deep_q():
+#     compare_deep_q_head_to_head("boards/small.txt", "states/test_debug.txt", 1001,
+#                                 EXPORT_DIR / "_checkpoint_lr=1e-5_wd=0_epoch=260_no_checkpoint.pth",
+#                                 EXPORT_DIR / "_checkpoint_lr=1e-5_wd=0_no_checkpoint.pth")
 
 
 def _main_train():
@@ -80,8 +80,8 @@ def _main():
         _main_random()
     elif args.base:
         _main_deep_q_vs_rand()
-    elif args.compare:
-        _compare_two_deep_q()
+    # elif args.compare:
+    #     _compare_two_deep_q()
 
 
 if __name__ == "__main__":
